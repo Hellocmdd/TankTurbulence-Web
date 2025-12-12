@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>坦克大战</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="start-screen" id="start-screen">
+    <div class="start-panel">
+      <div class="start-title">战场说明</div>
+      <div class="start-desc">阅读后点击下方“确认”开始游戏。</div>
+      <ul class="start-list">
+        <li><strong>目标：</strong>存活下来并清掉所有敌方坦克，进入更高关卡。</li>
+        <li><strong>移动：</strong>W 前进，S 后退；A/D 只用于左/右旋转方向。</li>
+        <li><strong>攻击：</strong>空格射击，弹夹 5 发，装弹后继续开火。</li>
+        <li><strong>小心：</strong>敌人会同时出现，子弹可多次反弹，护盾有限时间。</li>
+        <li><strong>重置：</strong>失败或想重开时按 R 立即重新开始。</li>
+      </ul>
+      <button id="start-button" class="start-btn">确认，开始战斗</button>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="title">坦克大战</div>
+    <div class="stats">
+      <span id="hud-level">关卡 1</span>
+      <span id="hud-lives">生命 3</span>
+      <span id="hud-enemies">敌人 0</span>
+      <span id="hud-status"></span>
+    </div>
+    <div class="controls">W/S 前进后退 · A/D 左右旋转 · 空格射击 · R 重开</div>
+  </div>
+
+  <div class="game-wrap">
+    <canvas id="game" width="960" height="640"></canvas>
+  </div>
+
+  <div class="footer">浏览器即可运行，建议全屏窗口体验。</div>
+
+  <script src="main.js"></script>
+</body>
+</html>
