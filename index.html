@@ -16,7 +16,7 @@
         <li><strong>移动：</strong>W 前进，S 后退；A/D 只用于左/右旋转方向。</li>
         <li><strong>攻击：</strong>空格射击，弹夹 5 发，装弹后继续开火。</li>
         <li><strong>小心：</strong>敌人会同时出现，子弹可多次反弹，护盾有限时间。</li>
-        <li><strong>重置：</strong>失败或想重开时按 R 立即重新开始。</li>
+        <li><strong>重置：</strong>按 R 可重开，失败时弹窗/按 R 重试当前关。</li>
       </ul>
       <button id="start-button" class="start-btn">确认，开始战斗</button>
     </div>
@@ -35,6 +35,14 @@
 
   <div class="game-wrap">
     <canvas id="game" width="960" height="640"></canvas>
+  </div>
+
+  <div class="start-screen hidden" id="modal-screen">
+    <div class="start-panel">
+      <div class="start-title" id="modal-title">提示</div>
+      <div class="start-desc" id="modal-desc">描述内容</div>
+      <button id="modal-button" class="start-btn">确认</button>
+    </div>
   </div>
 
   <div class="footer">浏览器即可运行，建议全屏窗口体验。</div>

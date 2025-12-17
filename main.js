@@ -7,6 +7,10 @@ const hudEnemies = document.getElementById("hud-enemies");
 const hudStatus = document.getElementById("hud-status");
 const startScreen = document.getElementById("start-screen");
 const startButton = document.getElementById("start-button");
+const modalScreen = document.getElementById("modal-screen");
+const modalTitle = document.getElementById("modal-title");
+const modalDesc = document.getElementById("modal-desc");
+const modalButton = document.getElementById("modal-button");
 const gameWrap = document.querySelector(".game-wrap");
 
 const tile = 64;
@@ -18,13 +22,14 @@ const bgmIntervalMs = (60 / bgmTempo / 2) * 1000; // eighth note timing
 const bgmRoots = [57, 60, 55, 62]; // midi note roots for a simple progression
 const bgmMelodyOffsets = [0, 2, 3, 5, 7, 5, 3, 2, 0, 2, 3, 5, 7, 9, 7, 5]; // semitone offsets from root
 const bgmArpOffsets = [0, 7, 12, 7];
-const powerupTypes = ["shield", "heart", "laser", "cannon", "mine"];
+const powerupTypes = ["shield", "heart", "laser", "cannon", "mine", "missile"];
 const powerupWeights = [
   { type: "shield", w: 0.7 }, // 略低概率
   { type: "heart", w: 1 },
   { type: "laser", w: 1 },
   { type: "cannon", w: 1 },
   { type: "mine", w: 1 },
+  { type: "missile", w: 10 },
 ];
 let laserColor = "#ff8cff";
 const defaultEnemySpawns = [
@@ -46,11 +51,15 @@ const game = {
   bullets: [],
   enemyQueue: 0,
   spawnTimer: 0,
+  pendingSpawns: [],
+  spawnWarnings: [],
   maxAlive: 3,
   player: null,
   status: "",
   respawnTimer: 0,
   gameOver: false,
+  paused: false,
+  modalAction: null,
   lastTime: 0,
   started: false,
   powerups: [],
@@ -437,6 +446,7 @@ function createTank(opts) {
     laserTimer: 0,
     cannonAmmo: 0,
     mineAmmo: 0,
+    missileAmmo: 0,
   };
 }
 
@@ -655,6 +665,72 @@ function playMineExplosionSound() {
   spark.stop(t + 0.2);
 }
 
+function playMissileLaunchSound() {
+  if (!audioCtx || !masterGain) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const oscGain = audioCtx.createGain();
+  const noise = audioCtx.createBufferSource();
+  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.18, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    const decay = 1 - i / data.length;
+    data[i] = (Math.random() * 2 - 1) * decay * 0.6;
+  }
+  noise.buffer = buf;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.value = 1800;
+  filter.Q.value = 0.8;
+
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(420, t);
+  osc.frequency.exponentialRampToValueAtTime(750, t + 0.18);
+  oscGain.gain.setValueAtTime(0.18, t);
+  oscGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+
+  noise.connect(filter).connect(masterGain);
+  osc.connect(oscGain).connect(masterGain);
+  osc.start(t);
+  noise.start(t);
+  osc.stop(t + 0.2);
+  noise.stop(t + 0.18);
+}
+
+function playMissileExplosionSound() {
+  if (!audioCtx || !masterGain) return;
+  const t = audioCtx.currentTime;
+  const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.7, audioCtx.sampleRate);
+  const data = noiseBuf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    const decay = 1 - i / data.length;
+    data[i] = (Math.random() * 2 - 1) * decay * decay * 1.1;
+  }
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = noiseBuf;
+  const whoosh = audioCtx.createOscillator();
+  const whooshGain = audioCtx.createGain();
+  whoosh.type = "triangle";
+  whoosh.frequency.setValueAtTime(180, t);
+  whoosh.frequency.exponentialRampToValueAtTime(60, t + 0.4);
+  whooshGain.gain.setValueAtTime(0.4, t);
+  whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 1200;
+  filter.Q.value = 0.6;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.65, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+  noise.connect(filter).connect(gain).connect(masterGain);
+  whoosh.connect(whooshGain).connect(masterGain);
+  whoosh.start(t);
+  noise.start(t);
+  noise.stop(t + 0.7);
+  whoosh.stop(t + 0.42);
+}
+
 function playShieldHitSound() {
   if (!audioCtx || !masterGain) return;
   const t = audioCtx.currentTime;
@@ -698,6 +774,10 @@ function playExplosionVariant(tag, opts = {}) {
       return;
     case "mine":
       playMineExplosionSound();
+      if (includeBase) playExplosionSound();
+      return;
+    case "missile":
+      playMissileExplosionSound();
       if (includeBase) playExplosionSound();
       return;
     case "none":
@@ -760,6 +840,38 @@ function stopBgm() {
   bgmStep = 0;
 }
 
+function showModal(opts) {
+  if (!modalScreen) return;
+  modalTitle.textContent = opts.title ?? "提示";
+  modalDesc.textContent = opts.desc ?? "";
+  modalButton.textContent = opts.buttonText ?? "确认";
+  modalButton.classList.toggle("retry", opts.action === "retryLevel");
+  modalScreen.classList.remove("hidden");
+  game.paused = true;
+  game.modalAction = opts.action ?? null;
+}
+
+function hideModal() {
+  if (!modalScreen) return;
+  modalScreen.classList.add("hidden");
+  game.paused = false;
+  game.modalAction = null;
+}
+
+function confirmModal() {
+  if (!game.modalAction) {
+    hideModal();
+    return;
+  }
+  const action = game.modalAction;
+  hideModal();
+  if (action === "nextLevel") {
+    startLevel(game.level + 1);
+  } else if (action === "retryLevel") {
+    retryCurrentLevel();
+  }
+}
+
 function beginGame() {
   if (game.started) return;
   game.started = true;
@@ -781,21 +893,32 @@ function resetGame() {
   game.enemies = [];
   game.bullets = [];
   game.enemyQueue = 0;
+  game.pendingSpawns = [];
+  game.spawnWarnings = [];
   game.powerups = [];
   game.powerupTimer = 2.5;
   game.mines = [];
   game.gameOver = false;
+  game.paused = false;
+  game.modalAction = null;
   game.shieldHitCooldown = 0;
+  if (modalScreen) modalScreen.classList.add("hidden");
   startLevel(1);
 }
 
 function startLevel(level) {
   game.level = level;
   applyTheme(level);
+  game.lives = 2 + level;
+  game.gameOver = false;
+  game.paused = false;
+  game.modalAction = null;
   game.enemies.length = 0;
   game.bullets.length = 0;
   game.enemyQueue = 3 + Math.max(0, level - 1);
   game.spawnTimer = 0.6;
+  game.pendingSpawns.length = 0;
+  game.spawnWarnings.length = 0;
   game.powerups.length = 0;
   game.powerupTimer = 3 + Math.random() * 3;
   game.mines.length = 0;
@@ -824,6 +947,10 @@ function startLevel(level) {
   updateHud();
 }
 
+function retryCurrentLevel() {
+  startLevel(game.level);
+}
+
 function respawnPlayer() {
   game.player.x = playerSpawn.x;
   game.player.y = playerSpawn.y;
@@ -834,16 +961,21 @@ function respawnPlayer() {
   game.player.laserTimer = 0;
   game.player.cannonAmmo = 0;
   game.player.mineAmmo = 0;
+  game.player.missileAmmo = 0;
   game.player.ammo = game.player.clipSize;
   game.player.reloadTimer = 0;
   game.player.fireCooldown = 0;
   game.player.deathTimer = 0;
 }
 
-function spawnEnemy() {
+function pickEnemySpawnPoint() {
   const slots = enemySpawns.length ? enemySpawns : defaultEnemySpawns;
   const slot = slots[Math.floor(Math.random() * slots.length)];
-  const pos = findFreePosition(slot.x, slot.y, minEnemyPlayerDistance(game.level));
+  return findFreePosition(slot.x, slot.y, minEnemyPlayerDistance(game.level));
+}
+
+function spawnEnemy(posOverride) {
+  const pos = posOverride ?? pickEnemySpawnPoint();
   const enemy = createTank({
     x: pos.x,
     y: pos.y,
@@ -860,6 +992,38 @@ function spawnEnemy() {
   enemy.spawnShield = 0.8;
   enemy.deathTimer = 0;
   game.enemies.push(enemy);
+}
+
+function scheduleEnemySpawn() {
+  const pos = pickEnemySpawnPoint();
+  const warningTime = 1;
+  if (!pos) return;
+  game.pendingSpawns.push({ x: pos.x, y: pos.y, timer: warningTime });
+  game.spawnWarnings.push({ x: pos.x, y: pos.y, ttl: warningTime, life: warningTime });
+  game.enemyQueue = Math.max(0, game.enemyQueue - 1);
+  game.spawnTimer = 1.1;
+}
+
+function updatePendingSpawns(dt) {
+  if (game.gameOver) return;
+  for (let i = game.pendingSpawns.length - 1; i >= 0; i--) {
+    const pending = game.pendingSpawns[i];
+    pending.timer -= dt;
+    if (pending.timer <= 0) {
+      spawnEnemy({ x: pending.x, y: pending.y });
+      game.pendingSpawns.splice(i, 1);
+    }
+  }
+}
+
+function updateSpawnWarnings(dt) {
+  for (let i = game.spawnWarnings.length - 1; i >= 0; i--) {
+    const warn = game.spawnWarnings[i];
+    warn.ttl -= dt;
+    if (warn.ttl <= 0) {
+      game.spawnWarnings.splice(i, 1);
+    }
+  }
 }
 
 function spawnPowerup() {
@@ -983,6 +1147,13 @@ function update(time) {
   game.lastTime = time;
   game.shieldHitCooldown = Math.max(0, game.shieldHitCooldown - dt);
 
+  if (game.paused) {
+    draw();
+    updateHud();
+    requestAnimationFrame(update);
+    return;
+  }
+
   if (!game.player) return;
 
   tickTankTimers(game.player, dt);
@@ -990,20 +1161,36 @@ function update(time) {
   handleInput(dt);
 
   game.spawnTimer -= dt;
-  if (!game.gameOver && game.enemyQueue > 0 && game.enemies.length < game.maxAlive && game.spawnTimer <= 0) {
-    spawnEnemy();
-    game.enemyQueue -= 1;
-    game.spawnTimer = 1.1;
+  if (
+    !game.gameOver &&
+    game.enemyQueue > 0 &&
+    game.enemies.length + game.pendingSpawns.length < game.maxAlive &&
+    game.spawnTimer <= 0
+  ) {
+    scheduleEnemySpawn();
   }
 
+  updatePendingSpawns(dt);
+  updateSpawnWarnings(dt);
   updateEnemies(dt);
   updateBullets(dt);
   updatePowerups(dt);
   updateMines(dt);
   updatePlayerRespawn(dt);
 
-  if (!game.gameOver && game.enemyQueue === 0 && game.enemies.length === 0) {
-    startLevel(game.level + 1);
+  if (
+    !game.gameOver &&
+    !game.paused &&
+    game.enemyQueue === 0 &&
+    game.pendingSpawns.length === 0 &&
+    game.enemies.length === 0
+  ) {
+    showModal({
+      title: `第 ${game.level} 关通过！`,
+      desc: "干得漂亮，点击确认进入下一关。",
+      buttonText: "确认继续",
+      action: "nextLevel",
+    });
   }
 
   draw();
@@ -1131,14 +1318,29 @@ function shoot(tank) {
   const speed = 420;
   const isLaser = tank.isPlayer && tank.laserTimer > 0;
   const useCannon = tank.isPlayer && tank.cannonAmmo > 0 && !isLaser;
-  const useMine = tank.isPlayer && tank.mineAmmo > 0 && !isLaser && !useCannon;
+  const useMissile = tank.isPlayer && tank.missileAmmo > 0 && !isLaser && !useCannon;
+  const useMine = tank.isPlayer && tank.mineAmmo > 0 && !isLaser && !useCannon && !useMissile;
   // Spawn muzzle a bit farther to avoid colliding with the shooter on spawn.
   const offset = tank.size * 0.8;
   const angle = tank.angle;
   const spawnX = tank.x + Math.cos(angle) * offset;
   const spawnY = tank.y + Math.sin(angle) * offset;
-  if (useMine) {
-    dropMine(tank);
+  let firedMissile = false;
+  if (isLaser) {
+    const end = computeLaserEnd(spawnX, spawnY, angle);
+    game.bullets.push({
+      x: spawnX,
+      y: spawnY,
+      ex: end.x,
+      ey: end.y,
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      owner: tank.isPlayer ? "player" : "enemy",
+      color: laserColor,
+      ttl: 0.2,
+      type: "laserBeam",
+      pierceWalls: true,
+    });
   } else if (useCannon) {
     game.bullets.push({
       x: spawnX,
@@ -1154,21 +1356,26 @@ function shoot(tank) {
       type: "cannonShell",
     });
     tank.cannonAmmo -= 1;
-  } else if (isLaser) {
-    const end = computeLaserEnd(spawnX, spawnY, angle);
+  } else if (useMissile) {
     game.bullets.push({
       x: spawnX,
       y: spawnY,
-      ex: end.x,
-      ey: end.y,
-      dx: Math.cos(angle) * speed,
-      dy: Math.sin(angle) * speed,
+      dx: Math.cos(angle) * 260,
+      dy: Math.sin(angle) * 260,
+      speed: 260,
       owner: tank.isPlayer ? "player" : "enemy",
-      color: laserColor,
-      ttl: 0.2,
-      type: "laserBeam",
-      pierceWalls: true,
+      color: "#ffd27f",
+      ttl: 4,
+      r: 6,
+      turnRate: 5.5,
+      seekRadius: 380,
+      type: "missile",
+      rotation: angle,
     });
+    tank.missileAmmo -= 1;
+    firedMissile = true;
+  } else if (useMine) {
+    dropMine(tank);
   } else {
     game.bullets.push({
       x: spawnX,
@@ -1186,6 +1393,8 @@ function shoot(tank) {
   }
   if (isLaser) {
     playLaserSound();
+  } else if (firedMissile) {
+    playMissileLaunchSound();
   } else {
     playShootSound();
   }
@@ -1210,7 +1419,14 @@ function killPlayer(opts = {}) {
   game.player.deathTimer = 0.6;
   if (game.lives <= 0) {
     game.gameOver = true;
-    game.status = "战败，按 R 重新开始";
+    game.status = "遗憾落败";
+    game.respawnTimer = 0;
+    showModal({
+      title: "遗憾！生命耗尽",
+      desc: `你在第 ${game.level} 关耗尽生命。点击“重试”重新开始本关。`,
+      buttonText: "重试",
+      action: "retryLevel",
+    });
   } else {
     game.respawnTimer = 1.2;
     game.status = "你被击中，准备复活";
@@ -1332,6 +1548,70 @@ function updateBullets(dt) {
       continue;
     }
 
+    if (b.type === "missile") {
+      const missileExplosion = {
+        radius: 95,
+        fragments: 12,
+        fragmentStyle: "poly",
+        randomFragments: true,
+        randomFragmentDirection: true,
+        flash: true,
+        flashRadius: 120,
+        sound: "missile",
+        avoidWalls: true,
+        avoidWallsDistance: 50,
+        avoidWallsPadding: 14,
+        clampToBounds: true,
+        clearPad: 8,
+      };
+      b.ttl -= dt;
+      if (b.ttl <= 0) {
+        explodeAt(b.x, b.y, b.owner, missileExplosion);
+        game.bullets.splice(i, 1);
+        continue;
+      }
+      const target = acquireMissileTarget(b);
+      if (target) {
+        const desired = Math.atan2(target.y - b.y, target.x - b.x);
+        const current = Math.atan2(b.dy, b.dx);
+        const diff = wrapAngle(desired - current);
+        const maxTurn = (b.turnRate ?? 4.5) * dt;
+        const nextAng = current + clamp(diff, -maxTurn, maxTurn);
+        const spd = b.speed ?? Math.hypot(b.dx, b.dy);
+        b.dx = Math.cos(nextAng) * spd;
+        b.dy = Math.sin(nextAng) * spd;
+        b.rotation = nextAng;
+      } else {
+        b.rotation = Math.atan2(b.dy, b.dx);
+      }
+      b.x += b.dx * dt;
+      b.y += b.dy * dt;
+      const circle = { x: b.x, y: b.y, r: b.r ?? 6 };
+      const hitWall = collidesWalls({ x: circle.x - circle.r, y: circle.y - circle.r, w: circle.r * 2, h: circle.r * 2 });
+      const hitBorder = circle.x < circle.r || circle.x > canvas.width - circle.r || circle.y < circle.r || circle.y > canvas.height - circle.r;
+      const playerHit = b.owner !== "player" && game.player.alive && circleRect(circle, tankRect(game.player));
+      const enemyIndex = b.owner === "player" ? game.enemies.findIndex((e) => e.alive && circleRect(circle, tankRect(e))) : -1;
+      if (hitWall || hitBorder || playerHit || enemyIndex !== -1) {
+        if (playerHit) {
+          if (!playerShielded()) {
+            killPlayer({ silent: true });
+          } else {
+            triggerShieldHitSound();
+          }
+        } else if (enemyIndex !== -1) {
+          const targetEnemy = game.enemies[enemyIndex];
+          if (targetEnemy.spawnShield <= 0) {
+            targetEnemy.alive = false;
+            targetEnemy.deathTimer = 0.6;
+          }
+        }
+        explodeAt(circle.x, circle.y, b.owner, missileExplosion);
+        game.bullets.splice(i, 1);
+        continue;
+      }
+      continue;
+    }
+
     b.ttl -= dt;
     b.x += b.dx * dt;
     b.y += b.dy * dt;
@@ -1374,6 +1654,30 @@ function updateBullets(dt) {
       target.deathTimer = 0.6;
     }
   }
+}
+
+function acquireMissileTarget(bullet) {
+  const radius = bullet.seekRadius ?? 340;
+  if (bullet.owner === "player") {
+    let closest = null;
+    let bestDist = radius + 1;
+    for (const e of game.enemies) {
+      if (!e.alive) continue;
+      const d = Math.hypot(e.x - bullet.x, e.y - bullet.y);
+      if (d > radius || d >= bestDist) continue;
+      if (!hasLineOfSight(bullet.x, bullet.y, e.x, e.y)) continue;
+      closest = e;
+      bestDist = d;
+    }
+    return closest;
+  }
+  if (bullet.owner === "enemy" && game.player?.alive) {
+    const d = Math.hypot(game.player.x - bullet.x, game.player.y - bullet.y);
+    if (d <= radius && hasLineOfSight(bullet.x, bullet.y, game.player.x, game.player.y)) {
+      return game.player;
+    }
+  }
+  return null;
 }
 
 function updatePowerups(dt) {
@@ -1450,7 +1754,7 @@ function applyPowerup(type) {
       game.status = "护盾已激活";
       break;
     case "heart":
-      game.lives = Math.min(5, game.lives + 1);
+      game.lives = Math.min(maxLives(), game.lives + 1);
       game.status = "生命 +1";
       break;
     case "laser":
@@ -1464,6 +1768,10 @@ function applyPowerup(type) {
     case "mine":
       p.mineAmmo = 2;
       game.status = "地雷可用";
+      break;
+    case "missile":
+      p.missileAmmo = 4;
+      game.status = "导弹锁定就绪";
       break;
     default:
       break;
@@ -1592,6 +1900,7 @@ function tickTankTimers(tank, dt) {
   if (tank.laserTimer > 0) tank.laserTimer = Math.max(0, tank.laserTimer - dt);
   if (tank.cannonAmmo < 0) tank.cannonAmmo = 0;
   if (tank.mineAmmo < 0) tank.mineAmmo = 0;
+  if (tank.missileAmmo < 0) tank.missileAmmo = 0;
   tank.fireCooldown = Math.max(0, tank.fireCooldown - dt);
   if (tank.reloadTimer > 0) {
     tank.reloadTimer -= dt;
@@ -1935,13 +2244,15 @@ function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
   drawWalls();
+  drawSpawnWarnings();
   drawPowerups();
   drawMines();
   drawBullets();
+  drawIngameCounters();
   drawPlayer();
   drawEnemies();
-  if (game.gameOver) {
-    drawOverlay("游戏结束", "按 R 重新开始");
+  if (game.gameOver && !game.modalAction) {
+    drawOverlay("游戏结束", "按 R 重试本关");
   }
 }
 
@@ -1973,6 +2284,54 @@ function drawWalls() {
   }
 }
 
+function drawSpawnWarnings() {
+  for (const warn of game.spawnWarnings) {
+    const t = clamp(warn.ttl / (warn.life || 1), 0, 1);
+    const baseR = 24;
+    const pulse = 10 * (1 - t);
+    ctx.save();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(255,138,160,${0.4 + 0.35 * t})`;
+    ctx.beginPath();
+    ctx.arc(warn.x, warn.y, baseR + pulse, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(255,221,153,${0.35 + 0.25 * t})`;
+    ctx.beginPath();
+    ctx.arc(warn.x, warn.y, baseR * 0.6 + pulse * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawIngameCounters() {
+  const remaining = remainingEnemiesTotal();
+  const pad = 14;
+  const gap = 6;
+  const boxW = 168;
+  const boxH = 66;
+  const x = pad;
+  const y = pad;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(12,14,22,0.65)";
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 2;
+  drawRoundedRectPath(ctx, x, y, boxW, boxH, 10);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 18px sans-serif";
+  ctx.fillText(`关卡 ${game.level}`, x + pad, y + pad);
+  ctx.fillStyle = "#ffd27f";
+  ctx.font = "bold 16px sans-serif";
+  ctx.fillText(`本关剩余 ${remaining}`, x + pad, y + pad + 22 + gap);
+  ctx.restore();
+}
+
 function drawPowerups() {
   const visuals = {
     shield: { fill: "rgba(120,200,255,0.18)", stroke: "#8ce1ff" },
@@ -1980,6 +2339,7 @@ function drawPowerups() {
     laser: { fill: "rgba(200,160,255,0.18)", stroke: "#c592ff" },
     cannon: { fill: "rgba(255,204,140,0.2)", stroke: "#ffb36b" },
     mine: { fill: "rgba(120,220,200,0.2)", stroke: "#6de0c1" },
+    missile: { fill: "rgba(255,255,255,0.2)", stroke: "#ffd27f" },
   };
 
   for (const p of game.powerups) {
@@ -2064,6 +2424,25 @@ function drawPowerupGlyph(type, r) {
       ctx.arc(r * 0.75, 0, r * 0.11, 0, Math.PI * 2);
       ctx.fillStyle = "#ffb36b";
       ctx.fill();
+      break;
+    }
+    case "missile": {
+      ctx.strokeStyle = "#ffd27f";
+      ctx.fillStyle = "rgba(255,210,127,0.35)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.55, 0);
+      ctx.lineTo(0, -r * 0.7);
+      ctx.lineTo(r * 0.55, 0);
+      ctx.lineTo(0, r * 0.7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.14, r * 0.7);
+      ctx.lineTo(0, r * 0.98);
+      ctx.lineTo(r * 0.14, r * 0.7);
+      ctx.stroke();
       break;
     }
     case "mine":
@@ -2203,6 +2582,7 @@ function turretMode(tank) {
   if (tank.isPlayer) {
     if (tank.laserTimer > 0) return "laser";
     if (tank.cannonAmmo > 0) return "cannon";
+    if (tank.missileAmmo > 0) return "missile";
     if (tank.mineAmmo > 0) return "mine";
   }
   return "normal";
@@ -2237,6 +2617,22 @@ function drawTurret(tank, w, h) {
       ctx.arc(w * 0.6, barrelY, 5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      break;
+    }
+    case "missile": {
+      ctx.fillStyle = "#ffd27f";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      drawRoundedRectPath(ctx, w * 0.08, barrelY - 5, w * 0.58, 10, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#ff8aa0";
+      ctx.beginPath();
+      ctx.moveTo(w * 0.55, barrelY - 6);
+      ctx.lineTo(w * 0.75, barrelY);
+      ctx.lineTo(w * 0.55, barrelY + 6);
+      ctx.closePath();
+      ctx.fill();
       break;
     }
     case "mine": {
@@ -2319,6 +2715,31 @@ function drawBullets() {
       ctx.fill();
       ctx.stroke();
       ctx.restore();
+    } else if (b.type === "missile") {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rotation ?? 0);
+      const bodyLen = (b.r ?? 6) * 2.2;
+      const bodyRad = (b.r ?? 6) * 0.7;
+      ctx.fillStyle = "#ffd27f";
+      ctx.strokeStyle = "#ff8aa0";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-bodyLen * 0.4, -bodyRad);
+      ctx.lineTo(bodyLen * 0.35, -bodyRad);
+      ctx.lineTo(bodyLen * 0.6, 0);
+      ctx.lineTo(bodyLen * 0.35, bodyRad);
+      ctx.lineTo(-bodyLen * 0.4, bodyRad);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-bodyLen * 0.45, -bodyRad * 0.9);
+      ctx.lineTo(-bodyLen * 0.8, 0);
+      ctx.lineTo(-bodyLen * 0.45, bodyRad * 0.9);
+      ctx.fillStyle = "rgba(255,138,160,0.6)";
+      ctx.fill();
+      ctx.restore();
     } else {
       ctx.fillStyle = b.color;
       ctx.beginPath();
@@ -2343,9 +2764,18 @@ function drawOverlay(title, subtitle) {
 function updateHud() {
   hudLevel.textContent = `关卡 ${game.level}`;
   hudLives.textContent = `生命 ${game.lives}`;
-  const remaining = game.enemyQueue + game.enemies.length;
+  const remaining = remainingEnemiesTotal();
   hudEnemies.textContent = `敌人 ${remaining}`;
   hudStatus.textContent = game.status;
+}
+
+function remainingEnemiesTotal() {
+  const aliveEnemies = game.enemies.filter((e) => e.alive).length;
+  return game.enemyQueue + game.pendingSpawns.length + aliveEnemies;
+}
+
+function maxLives() {
+  return 2 + game.level;
 }
 
 function setupControls() {
@@ -2354,8 +2784,24 @@ function setupControls() {
     if (["w", "a", "s", "d", " ", "space", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
       e.preventDefault();
     }
+    if (game.modalAction) {
+      if (key === "enter" || key === " ") {
+        e.preventDefault();
+        confirmModal();
+      } else if (key === "r" && game.modalAction === "retryLevel") {
+        e.preventDefault();
+        confirmModal();
+      }
+      return;
+    }
     if (key === "r") {
-      if (game.started) resetGame();
+      if (game.started) {
+        if (game.gameOver) {
+          retryCurrentLevel();
+        } else {
+          resetGame();
+        }
+      }
       return;
     }
     if (!game.started) return;
@@ -2376,4 +2822,7 @@ game.status = "阅读说明后点击“确认”开始";
 updateHud();
 if (startButton) {
   startButton.addEventListener("click", beginGame);
+}
+if (modalButton) {
+  modalButton.addEventListener("click", confirmModal);
 }

@@ -43,6 +43,10 @@ body {
   color: #e8ecff;
 }
 
+#modal-screen .start-panel {
+  text-align: center;
+}
+
 .start-title {
   font-size: 22px;
   letter-spacing: 1px;
@@ -98,6 +102,11 @@ body {
 
 .start-btn:active {
   transform: translateY(0);
+}
+
+.start-screen .start-btn.retry {
+  background: linear-gradient(90deg, #ff8aa0, #ffb36b);
+  color: #0b1018;
 }
 
 .hud {
