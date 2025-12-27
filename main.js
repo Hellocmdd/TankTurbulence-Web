@@ -11,27 +11,53 @@ const modalScreen = document.getElementById("modal-screen");
 const modalTitle = document.getElementById("modal-title");
 const modalDesc = document.getElementById("modal-desc");
 const modalButton = document.getElementById("modal-button");
+const modalSecondaryButton = document.getElementById("modal-secondary-button");
 const gameWrap = document.querySelector(".game-wrap");
+const modeScreen = document.getElementById("mode-screen");
+const modeNormalBtn = document.getElementById("mode-normal-btn");
+const modeOneLifeBtn = document.getElementById("mode-one-life-btn");
+const playerStyleOptions = document.getElementById("player-style-options");
 
 const tile = 64;
 let walls = [];
 let bulletColor = "#8ce1ff";
 const enemySpawnCount = 3;
-const bgmTempo = 112;
-const bgmIntervalMs = (60 / bgmTempo / 2) * 1000; // eighth note timing
-const bgmRoots = [57, 60, 55, 62]; // midi note roots for a simple progression
-const bgmMelodyOffsets = [0, 2, 3, 5, 7, 5, 3, 2, 0, 2, 3, 5, 7, 9, 7, 5]; // semitone offsets from root
-const bgmArpOffsets = [0, 7, 12, 7];
+const defaultBgmConfig = {
+  tempo: 112,
+  roots: [57, 60, 55, 62], // midi note roots for a simple progression
+  melody: [0, 2, 3, 5, 7, 5, 3, 2, 0, 2, 3, 5, 7, 9, 7, 5],
+  arp: [0, 7, 12, 7],
+  leadWave: "triangle",
+  bassWave: "sawtooth",
+  arpWave: "square",
+  accentWave: "sine",
+  melodyVolume: 0.35,
+  bassVolume: 0.6,
+  arpVolume: 0.28,
+  accentVolume: 0.18,
+  accentOffset: 3,
+  hatVolume: 0.035,
+  hatEvery: 2,
+  bassEvery: 4,
+  arpEvery: 8,
+  arpPhase: 4,
+  accentEvery: 8,
+  accentPhase: 6,
+  bassOffset: 0,
+};
 const powerupTypes = ["shield", "heart", "laser", "cannon", "mine", "missile"];
-const powerupWeights = [
-  { type: "shield", w: 0.7 }, // 略低概率
-  { type: "heart", w: 1 },
+const basePowerupWeights = [
+  { type: "shield", w: 0.8 }, // 略低
+  { type: "heart", w: 0.8 }, // 略低
   { type: "laser", w: 1 },
   { type: "cannon", w: 1 },
   { type: "mine", w: 1 },
-  { type: "missile", w: 10 },
+  { type: "missile", w: 0.8 }, // 略低
 ];
 let laserColor = "#ff8cff";
+const missileColor = "#43ff9e";
+const missileAccentColor = "#ff4fb8";
+const missileDarkColor = "#0b2a22";
 const defaultEnemySpawns = [
   { x: tile * 1 + tile / 2, y: tile / 2 },
   { x: tile * 7 + tile / 2, y: tile / 2 },
@@ -43,6 +69,81 @@ const defaultPlayerSpawn = { x: canvas.width / 2, y: canvas.height - tile * 0.6 
 let playerSpawn = { ...defaultPlayerSpawn };
 const minPlayerSpawnShift = Math.min(canvas.width, canvas.height) * 0.35;
 const minEnemyPlayerDistanceBase = Math.min(canvas.width, canvas.height) * 0.6;
+const playerSkins = [
+  {
+    id: "vanguard",
+    name: "先锋绿",
+    desc: "均衡装甲，带侧裙",
+    color: "#7fe495",
+    turretColor: "#d5ffe4",
+    accentColor: "#1f4a35",
+    detailColor: "#0f1d16",
+    skin: "panel",
+  },
+  {
+    id: "glacier",
+    name: "冰霜蓝",
+    desc: "冷色涂装，前盖高亮",
+    color: "#8ad0ff",
+    turretColor: "#d9ecff",
+    accentColor: "#3c6fa3",
+    detailColor: "#0f1a2a",
+    skin: "split",
+  },
+  {
+    id: "ember",
+    name: "余烬红",
+    desc: "高对比条纹，攻击感",
+    color: "#ff7f91",
+    turretColor: "#ffd8c2",
+    accentColor: "#7a1f32",
+    detailColor: "#1b0f18",
+    skin: "stripe",
+  },
+  {
+    id: "shadow",
+    name: "夜袭黑",
+    desc: "暗色镶边，金色炮塔",
+    color: "#6d6f8a",
+    turretColor: "#ffe17a",
+    accentColor: "#3d4166",
+    detailColor: "#0f111b",
+    skin: "rogue",
+  },
+  {
+    id: "aurora",
+    name: "极光幻彩",
+    desc: "蓝紫渐变，霓虹外圈",
+    color: "#5ecbff",
+    turretColor: "#d2e6ff",
+    accentColor: "#b48bff",
+    detailColor: "#0e1826",
+    skin: "prism",
+  },
+  {
+    id: "phoenix",
+    name: "金焰流光",
+    desc: "金橙渐变，前甲高亮",
+    color: "#ffb36b",
+    turretColor: "#ffe8b8",
+    accentColor: "#ff6f3c",
+    detailColor: "#20130b",
+    skin: "royal",
+  },
+];
+const enemySkinsNormal = [
+  { color: "#ffb36b", turretColor: "#ffd9a1", accentColor: "#7a4925", detailColor: "#1a120c", skin: "panel" },
+  { color: "#6f9cff", turretColor: "#ffe17a", accentColor: "#243b73", detailColor: "#0e1426", skin: "stripe" },
+  { color: "#77d79c", turretColor: "#f1ffcc", accentColor: "#1d5035", detailColor: "#0d1c14", skin: "split" },
+  { color: "#c97bff", turretColor: "#ffe17a", accentColor: "#4a2d73", detailColor: "#170e24", skin: "vanguard" },
+];
+const enemySkinsOneLife = [
+  { color: "#78d4ff", turretColor: "#ffe17a", accentColor: "#1e4a68", detailColor: "#0e1c24", skin: "rogue" },
+  { color: "#ff9f7a", turretColor: "#ffe8b8", accentColor: "#6c2f1f", detailColor: "#1a0f0b", skin: "stripe" },
+  { color: "#9ad59c", turretColor: "#e8ffc9", accentColor: "#235330", detailColor: "#0f1c15", skin: "panel" },
+  { color: "#7ab5ff", turretColor: "#ffe17a", accentColor: "#2b4c88", detailColor: "#0f1a28", skin: "split" },
+];
+let selectedPlayerSkinId = playerSkins[0]?.id ?? "vanguard";
 
 const game = {
   level: 1,
@@ -60,12 +161,19 @@ const game = {
   gameOver: false,
   paused: false,
   modalAction: null,
+  modalSecondaryAction: null,
+  modalActionStatus: null,
+  modalSecondaryActionStatus: null,
   lastTime: 0,
   started: false,
+  loopStarted: false,
   powerups: [],
   powerupTimer: 0,
   mines: [],
   shieldHitCooldown: 0,
+  mode: "normal",
+  oneLife: false,
+  livesInitialized: false,
 };
 
 const keys = {};
@@ -73,6 +181,7 @@ let audioCtx = null;
 let masterGain = null;
 let bgmTimer = null;
 let bgmStep = 0;
+let activeBgmConfig = null;
 
 const levelThemes = [
   {
@@ -86,17 +195,38 @@ const levelThemes = [
     wrapBg: "#0c0d12",
     bulletColor: "#8ce1ff",
     laserColor: "#ff8cff",
+    bgm: {
+      tempo: 116,
+      roots: [57, 62, 59, 64],
+      melody: [0, 2, 5, 7, 9, 7, 5, 2, 0, 2, 3, 7, 9, 7, 5, 3],
+      arp: [0, 7, 12, 19],
+      accentOffset: 5,
+      accentWave: "triangle",
+    },
   },
   {
-    name: "沙漠日落",
-    canvasBg: "linear-gradient(135deg,#4f2d1a,#a15c27,#d99a52)",
-    gridColor: "rgba(255,235,200,0.18)",
-    wallFill: "#9b6b3d",
-    wallStroke: "rgba(255,235,200,0.25)",
-    canvasBorder: "#c48745",
-    wrapBg: "#20140d",
-    bulletColor: "#ffd27f",
-    laserColor: "#ff9f6e",
+    name: "紫雾黄昏",
+    canvasBg: "linear-gradient(140deg,#1b0f2a,#3a1a5a,#6b2a73)",
+    gridColor: "rgba(255,220,255,0.14)",
+    wallFill: "#3a234e",
+    wallStroke: "rgba(255,220,255,0.22)",
+    canvasBorder: "#7a3fa3",
+    wrapBg: "#120714",
+    bulletColor: "#4f6bff", // 靛蓝色：避开炮弹/炮台的暖黄橙，也和第3关的冰蓝区分
+    laserColor: "#ffb86b",
+    bgm: {
+      tempo: 104,
+      roots: [60, 63, 58, 65],
+      melody: [0, 3, 5, 7, 10, 7, 5, 3, 0, 3, 5, 8, 10, 8, 5, 3],
+      arp: [0, 10, 15, 10],
+      leadWave: "sine",
+      bassWave: "triangle",
+      arpWave: "triangle",
+      hatVolume: 0.028,
+      accentOffset: 2,
+      accentWave: "triangle",
+      accentVolume: 0.14,
+    },
   },
   {
     name: "极地霜寒",
@@ -108,6 +238,20 @@ const levelThemes = [
     wrapBg: "#0e1a22",
     bulletColor: "#9ef0ff",
     laserColor: "#c4a3ff",
+    bgm: {
+      tempo: 96,
+      roots: [52, 55, 48, 50],
+      melody: [0, 2, 7, 5, 4, 2, 0, 2, 0, 5, 7, 9, 7, 5, 4, 2],
+      arp: [0, 7, 12, 19],
+      hatEvery: 4,
+      hatVolume: 0.022,
+      bassEvery: 8,
+      leadWave: "triangle",
+      bassWave: "sine",
+      arpWave: "triangle",
+      accentOffset: 7,
+      accentVolume: 0.16,
+    },
   },
   {
     name: "丛林迷雾",
@@ -119,6 +263,20 @@ const levelThemes = [
     wrapBg: "#0c1a12",
     bulletColor: "#a6ff8a",
     laserColor: "#92ffd9",
+    bgm: {
+      tempo: 102,
+      roots: [55, 57, 53, 60],
+      melody: [0, 2, 5, 7, 5, 2, 0, -2, 0, 2, 5, 9, 7, 5, 2, 0],
+      arp: [0, 5, 12, 5],
+      leadWave: "square",
+      bassWave: "triangle",
+      arpWave: "square",
+      hatEvery: 1,
+      hatVolume: 0.02,
+      accentOffset: 5,
+      accentWave: "triangle",
+      accentVolume: 0.14,
+    },
   },
   {
     name: "熔炉工厂",
@@ -130,6 +288,20 @@ const levelThemes = [
     wrapBg: "#10131c",
     bulletColor: "#ffdd99",
     laserColor: "#ff8cff",
+    bgm: {
+      tempo: 122,
+      roots: [52, 54, 50, 57],
+      melody: [0, 3, 7, 10, 7, 3, 0, -2, 0, 3, 7, 12, 10, 7, 3, 0],
+      arp: [0, 7, 10, 14],
+      leadWave: "square",
+      bassWave: "sawtooth",
+      arpWave: "sawtooth",
+      hatVolume: 0.04,
+      bassEvery: 2,
+      accentOffset: 4,
+      accentWave: "square",
+      accentVolume: 0.22,
+    },
   },
 ];
 
@@ -158,6 +330,68 @@ function applyTheme(level) {
 
 function currentTheme() {
   return game.theme ?? levelThemes[0];
+}
+
+function baseLivesForLevel(level) {
+  return 2 + level;
+}
+
+function currentPowerupWeights() {
+  if (!game.oneLife) return basePowerupWeights;
+  return basePowerupWeights.map((p) => ({
+    ...p,
+    w: p.type === "heart" ? p.w * 1.2 : p.w,
+  }));
+}
+
+function powerupFreqMultiplier() {
+  return game.oneLife ? 1 / 1.5 : 1;
+}
+
+function initialPowerupDelay() {
+  return (3 + Math.random() * 3) * powerupFreqMultiplier();
+}
+
+function powerupRespawnDelay() {
+  return (7 + Math.random() * 5) * powerupFreqMultiplier();
+}
+
+function buildBgmConfig(theme) {
+  const base = defaultBgmConfig;
+  const cfg = (theme && theme.bgm) || {};
+  const merged = { ...base, ...cfg };
+  merged.roots = (cfg.roots && cfg.roots.length ? cfg.roots : base.roots).slice();
+  merged.melody = (cfg.melody && cfg.melody.length ? cfg.melody : base.melody).slice();
+  const hasArp = Object.prototype.hasOwnProperty.call(cfg, "arp");
+  const arpSource = hasArp ? cfg.arp : base.arp;
+  merged.arp = Array.isArray(arpSource) && arpSource.length ? arpSource.slice() : [];
+  merged.tempo = cfg.tempo ?? base.tempo;
+  merged.hatEvery = Math.max(1, cfg.hatEvery ?? base.hatEvery ?? 2);
+  merged.bassEvery = Math.max(1, cfg.bassEvery ?? base.bassEvery ?? 4);
+  merged.arpEvery = Math.max(1, cfg.arpEvery ?? base.arpEvery ?? 8);
+  merged.arpPhase = cfg.arpPhase ?? base.arpPhase ?? Math.floor(merged.arpEvery / 2);
+  merged.accentEvery = Math.max(1, cfg.accentEvery ?? base.accentEvery ?? 8);
+  merged.accentPhase = cfg.accentPhase ?? base.accentPhase ?? Math.max(1, merged.accentEvery - 2);
+  merged.bassOffset = cfg.bassOffset ?? base.bassOffset ?? 0;
+  return merged;
+}
+
+function currentBgmConfig() {
+  if (!activeBgmConfig) {
+    activeBgmConfig = buildBgmConfig(currentTheme());
+  }
+  return activeBgmConfig;
+}
+
+function setBgmTheme(theme) {
+  activeBgmConfig = buildBgmConfig(theme);
+}
+
+function syncBgmToTheme(theme) {
+  setBgmTheme(theme);
+  if (bgmTimer) {
+    startBgm(true);
+  }
 }
 
 function minEnemyPlayerDistance(level = 1) {
@@ -424,11 +658,36 @@ function buildWalls(level, playerSpawnPoint, enemySpawnPoints) {
   return wallsPlaced;
 }
 
+function playerStyleById(id) {
+  return playerSkins.find((s) => s.id === id) ?? playerSkins[0];
+}
+
+function currentPlayerStyle() {
+  return playerStyleById(selectedPlayerSkinId);
+}
+
+function applyStyleToTank(tank, style) {
+  if (!tank || !style) return;
+  tank.color = style.color ?? tank.color;
+  tank.turretColor = style.turretColor ?? tank.color;
+  tank.skin = style.skin ?? tank.skin ?? "default";
+  tank.accentColor = style.accentColor ?? null;
+  tank.detailColor = style.detailColor ?? null;
+}
+
+function pickEnemyStyle(oneLife = false) {
+  const pool = oneLife ? enemySkinsOneLife : enemySkinsNormal;
+  if (!pool.length) return null;
+  const idx = Math.floor(Math.random() * pool.length);
+  return pool[idx];
+}
+
 function createTank(opts) {
   return {
     x: opts.x,
     y: opts.y,
     angle: opts.angle ?? -Math.PI / 2,
+    turretAngle: opts.turretAngle ?? opts.angle ?? -Math.PI / 2,
     speed: opts.speed ?? 180,
     size: 40,
     color: opts.color ?? "#6cf",
@@ -439,11 +698,15 @@ function createTank(opts) {
     reloadTime: opts.reloadTime ?? 3,
     reloadTimer: 0,
     isPlayer: !!opts.isPlayer,
+    turretColor: opts.turretColor ?? null,
+    skin: opts.skin ?? "default",
+    accentColor: opts.accentColor ?? null,
+    detailColor: opts.detailColor ?? null,
     alive: true,
     spawnShield: opts.spawnShield ?? 0,
     ai: opts.ai ?? null,
     powerShieldTimer: 0,
-    laserTimer: 0,
+    laserAmmo: 0,
     cannonAmmo: 0,
     mineAmmo: 0,
     missileAmmo: 0,
@@ -800,36 +1063,55 @@ function triggerShieldHitSound() {
   game.shieldHitCooldown = 0.18;
 }
 
-function startBgm() {
+function startBgm(forceRestart = false) {
   if (!audioCtx || !masterGain) return;
-  if (bgmTimer) return;
+  if (bgmTimer) {
+    if (!forceRestart) return;
+    stopBgm();
+  }
+  const config = currentBgmConfig();
   bgmStep = 0;
+  const intervalMs = (60 / (config.tempo ?? defaultBgmConfig.tempo) / 2) * 1000; // eighth note timing
   const tick = () => {
     if (!audioCtx || !masterGain) return;
     const bar = Math.floor(bgmStep / 16);
-    const root = bgmRoots[bar % bgmRoots.length];
+    const root = config.roots[bar % config.roots.length];
 
-    const melodyOffset = bgmMelodyOffsets[bgmStep % bgmMelodyOffsets.length];
-    playTone(midiToFreq(root + melodyOffset), 0.35, 0.07, "triangle");
+    const melodyOffset = config.melody[bgmStep % config.melody.length];
+    playTone(midiToFreq(root + melodyOffset), config.melodyVolume ?? 0.35, 0.07, config.leadWave ?? "triangle");
 
-    if (bgmStep % 4 === 0) {
-      playTone(midiToFreq(root - 12), 0.6, 0.09, "sawtooth");
+    if (bgmStep % config.bassEvery === 0) {
+      playTone(
+        midiToFreq(root - 12 + (config.bassOffset ?? 0)),
+        config.bassVolume ?? 0.6,
+        0.09,
+        config.bassWave ?? "sawtooth"
+      );
     }
-    if (bgmStep % 8 === 4) {
-      const arp = bgmArpOffsets[Math.floor(bgmStep / 8) % bgmArpOffsets.length];
-      playTone(midiToFreq(root + arp), 0.28, 0.06, "square");
+    if (config.arp.length) {
+      const phase = config.arpPhase ?? Math.floor(config.arpEvery / 2);
+      if (bgmStep % config.arpEvery === phase % config.arpEvery) {
+        const arp = config.arp[Math.floor(bgmStep / config.arpEvery) % config.arp.length];
+        playTone(midiToFreq(root + arp), config.arpVolume ?? 0.28, 0.06, config.arpWave ?? "square");
+      }
     }
-    if (bgmStep % 2 === 0) {
-      playHat(0.035);
+    if (bgmStep % config.hatEvery === 0) {
+      playHat(config.hatVolume ?? 0.035);
     }
-    if (bgmStep % 8 === 6) {
-      playTone(midiToFreq(root + 3), 0.18, 0.05, "sine");
+    const accentPhase = config.accentPhase ?? Math.max(1, config.accentEvery - 2);
+    if (bgmStep % config.accentEvery === accentPhase % config.accentEvery) {
+      playTone(
+        midiToFreq(root + (config.accentOffset ?? 3)),
+        config.accentVolume ?? 0.18,
+        0.05,
+        config.accentWave ?? "sine"
+      );
     }
 
     bgmStep += 1;
   };
   tick();
-  bgmTimer = setInterval(tick, bgmIntervalMs);
+  bgmTimer = setInterval(tick, intervalMs);
 }
 
 function stopBgm() {
@@ -840,15 +1122,57 @@ function stopBgm() {
   bgmStep = 0;
 }
 
+function clearActiveObjects() {
+  game.powerups.length = 0;
+  game.pendingSpawns.length = 0;
+  game.spawnWarnings.length = 0;
+  game.enemies.length = 0;
+  game.bullets.length = 0;
+  game.mines.length = 0;
+}
+
+function returnToSkinSelect(statusText = "返回皮肤/模式选择") {
+  stopBgm();
+  game.started = false;
+  game.paused = true;
+  game.gameOver = true;
+  game.modalAction = null;
+  game.modalSecondaryAction = null;
+  game.modalActionStatus = null;
+  game.modalSecondaryActionStatus = null;
+  clearActiveObjects();
+  for (const key in keys) {
+    delete keys[key];
+  }
+  if (modeScreen) modeScreen.classList.remove("hidden");
+  if (startScreen) startScreen.classList.add("hidden");
+  if (modalScreen) modalScreen.classList.add("hidden");
+  game.status = statusText;
+  updateHud();
+}
+
+function returnToMenuAfterFailOneLife(statusText = "一命用尽，返回模式选择") {
+  returnToSkinSelect(statusText);
+}
+
 function showModal(opts) {
   if (!modalScreen) return;
   modalTitle.textContent = opts.title ?? "提示";
   modalDesc.textContent = opts.desc ?? "";
   modalButton.textContent = opts.buttonText ?? "确认";
   modalButton.classList.toggle("retry", opts.action === "retryLevel");
+  const hasSecondary = !!(opts.secondaryText || typeof opts.secondaryAction !== "undefined");
+  if (modalSecondaryButton) {
+    modalSecondaryButton.textContent = opts.secondaryText ?? "取消";
+    modalSecondaryButton.style.display = hasSecondary ? "block" : "none";
+    modalSecondaryButton.classList.toggle("retry", opts.secondaryAction === "retryLevel");
+  }
   modalScreen.classList.remove("hidden");
   game.paused = true;
   game.modalAction = opts.action ?? null;
+  game.modalSecondaryAction = hasSecondary ? opts.secondaryAction ?? null : null;
+  game.modalActionStatus = opts.actionStatus ?? null;
+  game.modalSecondaryActionStatus = hasSecondary ? opts.secondaryActionStatus ?? null : null;
 }
 
 function hideModal() {
@@ -856,39 +1180,70 @@ function hideModal() {
   modalScreen.classList.add("hidden");
   game.paused = false;
   game.modalAction = null;
+  game.modalSecondaryAction = null;
+  game.modalActionStatus = null;
+  game.modalSecondaryActionStatus = null;
 }
 
-function confirmModal() {
-  if (!game.modalAction) {
+function confirmModal(which = "primary") {
+  if (!game.modalAction && !game.modalSecondaryAction) {
     hideModal();
     return;
   }
-  const action = game.modalAction;
+  const action = which === "secondary" ? game.modalSecondaryAction : game.modalAction;
+  const statusText = which === "secondary" ? game.modalSecondaryActionStatus : game.modalActionStatus;
   hideModal();
+  handleModalAction(action, statusText);
+}
+
+function handleModalAction(action, statusText) {
+  if (!action) return;
   if (action === "nextLevel") {
     startLevel(game.level + 1);
   } else if (action === "retryLevel") {
     retryCurrentLevel();
+  } else if (action === "backToModeSelect" || action === "backToSkinSelect") {
+    returnToSkinSelect(statusText ?? "选择模式重新挑战");
   }
 }
 
 function beginGame() {
-  if (game.started) return;
-  game.started = true;
-  game.lastTime = performance.now();
+  if (modeScreen) modeScreen.classList.remove("hidden");
   if (startScreen) startScreen.classList.add("hidden");
+  game.started = false;
+  game.paused = true;
+  game.status = "请选择模式开始战斗";
+  updateHud();
+}
+
+function startGameWithMode(mode) {
+  const oneLife = mode === "oneLife";
+  game.mode = oneLife ? "oneLife" : "normal";
+  game.oneLife = oneLife;
+  game.livesInitialized = false;
+  game.started = true;
+  game.gameOver = false;
+  game.paused = false;
+  game.status = "";
+  game.lastTime = performance.now();
+  if (modeScreen) modeScreen.classList.add("hidden");
+  if (startScreen) startScreen.classList.add("hidden");
+  if (modalScreen) modalScreen.classList.add("hidden");
   for (const key in keys) {
     delete keys[key];
   }
   initAudio();
-  startBgm();
   resetGame();
-  requestAnimationFrame(update);
+  startBgm();
+  if (!game.loopStarted) {
+    game.loopStarted = true;
+    requestAnimationFrame(update);
+  }
 }
 
 function resetGame() {
   game.level = 1;
-  game.lives = 3;
+  game.lives = baseLivesForLevel(1);
   game.status = "";
   game.enemies = [];
   game.bullets = [];
@@ -896,12 +1251,16 @@ function resetGame() {
   game.pendingSpawns = [];
   game.spawnWarnings = [];
   game.powerups = [];
-  game.powerupTimer = 2.5;
+  game.powerupTimer = initialPowerupDelay();
   game.mines = [];
   game.gameOver = false;
   game.paused = false;
   game.modalAction = null;
+  game.modalSecondaryAction = null;
+  game.modalActionStatus = null;
+  game.modalSecondaryActionStatus = null;
   game.shieldHitCooldown = 0;
+  game.livesInitialized = false;
   if (modalScreen) modalScreen.classList.add("hidden");
   startLevel(1);
 }
@@ -909,10 +1268,23 @@ function resetGame() {
 function startLevel(level) {
   game.level = level;
   applyTheme(level);
-  game.lives = 2 + level;
+  syncBgmToTheme(currentTheme());
+  const isOneLife = game.oneLife;
+  const baseLives = baseLivesForLevel(level);
+  if (isOneLife) {
+    if (!game.livesInitialized || level === 1 || game.lives <= 0) {
+      game.lives = baseLives;
+      game.livesInitialized = true;
+    }
+  } else {
+    game.lives = baseLives;
+  }
   game.gameOver = false;
   game.paused = false;
   game.modalAction = null;
+  game.modalSecondaryAction = null;
+  game.modalActionStatus = null;
+  game.modalSecondaryActionStatus = null;
   game.enemies.length = 0;
   game.bullets.length = 0;
   game.enemyQueue = 3 + Math.max(0, level - 1);
@@ -920,20 +1292,26 @@ function startLevel(level) {
   game.pendingSpawns.length = 0;
   game.spawnWarnings.length = 0;
   game.powerups.length = 0;
-  game.powerupTimer = 3 + Math.random() * 3;
+  game.powerupTimer = initialPowerupDelay();
   game.mines.length = 0;
   const themeName = currentTheme().name ? ` · ${currentTheme().name}` : "";
-  game.status = `第 ${level} 关${themeName}`;
+  const modeLabel = isOneLife ? " · 一命过关" : "";
+  game.status = `第 ${level} 关${themeName}${modeLabel}`;
   game.respawnTimer = 0;
   const previousSpawn = playerSpawn;
   playerSpawn = pickPlayerSpawn(previousSpawn, level);
   enemySpawns = generateEnemySpawns(playerSpawn, enemySpawnCount, level);
   walls = buildWalls(level, playerSpawn, enemySpawns);
+  const playerStyle = currentPlayerStyle();
   if (!game.player) {
     game.player = createTank({
       x: playerSpawn.x,
       y: playerSpawn.y,
-      color: "#7fe495",
+      color: playerStyle.color ?? "#7fe495",
+      turretColor: playerStyle.turretColor,
+      skin: playerStyle.skin,
+      accentColor: playerStyle.accentColor,
+      detailColor: playerStyle.detailColor,
       speed: 220,
       fireRate: 0.3,
       clipSize: 5,
@@ -942,6 +1320,7 @@ function startLevel(level) {
       spawnShield: 1.2,
     });
   } else {
+    applyStyleToTank(game.player, playerStyle);
     respawnPlayer();
   }
   updateHud();
@@ -955,10 +1334,11 @@ function respawnPlayer() {
   game.player.x = playerSpawn.x;
   game.player.y = playerSpawn.y;
   game.player.angle = -Math.PI / 2;
+  game.player.turretAngle = game.player.angle;
   game.player.alive = true;
   game.player.spawnShield = 1.2;
   game.player.powerShieldTimer = 0;
-  game.player.laserTimer = 0;
+  game.player.laserAmmo = 0;
   game.player.cannonAmmo = 0;
   game.player.mineAmmo = 0;
   game.player.missileAmmo = 0;
@@ -976,10 +1356,19 @@ function pickEnemySpawnPoint() {
 
 function spawnEnemy(posOverride) {
   const pos = posOverride ?? pickEnemySpawnPoint();
+  const pickedSkin =
+    pickEnemyStyle(game.oneLife) ||
+    (game.oneLife
+      ? { color: "#78d4ff", turretColor: "#ffe17a", skin: "rogue" }
+      : { color: "#ffb36b", turretColor: null, skin: "default" });
   const enemy = createTank({
     x: pos.x,
     y: pos.y,
-    color: "#ffb36b",
+    color: pickedSkin.color,
+    turretColor: pickedSkin.turretColor,
+    skin: pickedSkin.skin,
+    accentColor: pickedSkin.accentColor,
+    detailColor: pickedSkin.detailColor,
     speed: 150,
     fireRate: 1.2,
     clipSize: 5,
@@ -987,6 +1376,7 @@ function spawnEnemy(posOverride) {
     ai: {
       changeTimer: 0.2,
       targetAngle: Math.atan2(canvas.height * 0.6 - pos.y, canvas.width / 2 - pos.x),
+      backoffTimer: 0,
     },
   });
   enemy.spawnShield = 0.8;
@@ -1027,10 +1417,11 @@ function updateSpawnWarnings(dt) {
 }
 
 function spawnPowerup() {
-  const totalWeight = powerupWeights.reduce((sum, p) => sum + p.w, 0);
+  const weights = currentPowerupWeights();
+  const totalWeight = weights.reduce((sum, p) => sum + p.w, 0);
   let pick = Math.random() * totalWeight;
   let type = powerupTypes[0];
-  for (const p of powerupWeights) {
+  for (const p of weights) {
     if (pick <= p.w) {
       type = p.type;
       break;
@@ -1130,16 +1521,40 @@ function findFreePosition(x, y, minDistanceFromPlayer = 0) {
     }
   }
 
-  // Final fallback: clamp the requested slot into bounds, but still insist on being away from the player if possible.
+  // Final fallback: clamp and probe a few relaxed options that still avoid walls/tanks.
   const fallback = {
     x: clamp(x, temp.w / 2, canvas.width - temp.w / 2),
     y: clamp(y, temp.h / 2, canvas.height - temp.h / 2),
   };
-  if (farFromPlayer(fallback.x, fallback.y, minDistanceFromPlayer * 0.8)) return fallback;
-  return {
-    x: clamp(fallback.x + tile * 2, temp.w / 2, canvas.width - temp.w / 2),
-    y: clamp(fallback.y - tile * 2, temp.h / 2, canvas.height - temp.h / 2),
-  };
+  const fallbackDist = minDistanceFromPlayer > 0 ? minDistanceFromPlayer * 0.8 : 0;
+  const fallbackOffsets = [
+    { ox: 0, oy: 0, dist: fallbackDist },
+    { ox: tile * 2, oy: -tile * 2, dist: fallbackDist * 0.7 },
+    { ox: -tile * 2, oy: tile * 2, dist: fallbackDist * 0.5 },
+  ];
+  for (const opt of fallbackOffsets) {
+    const cx = clamp(fallback.x + opt.ox, temp.w / 2, canvas.width - temp.w / 2);
+    const cy = clamp(fallback.y + opt.oy, temp.h / 2, canvas.height - temp.h / 2);
+    if (tryCandidate(cx, cy, opt.dist)) return { x: cx, y: cy };
+  }
+
+  // Wider scatter with relaxed distance to guarantee an empty tile that is not inside walls.
+  for (let i = 0; i < 260; i++) {
+    const relaxDist = i < 160 ? fallbackDist * 0.6 : fallbackDist * 0.3;
+    const cx = clamp(Math.random() * canvas.width, temp.w / 2, canvas.width - temp.w / 2);
+    const cy = clamp(Math.random() * canvas.height, temp.h / 2, canvas.height - temp.h / 2);
+    if (tryCandidate(cx, cy, relaxDist)) return { x: cx, y: cy };
+  }
+
+  // Last resort deterministic sweep, ignoring player distance but still avoiding walls.
+  const step = tile * 0.5;
+  for (let cy = temp.h / 2; cy <= canvas.height - temp.h / 2; cy += step) {
+    for (let cx = temp.w / 2; cx <= canvas.width - temp.w / 2; cx += step) {
+      if (tryCandidate(cx, cy, 0)) return { x: cx, y: cy };
+    }
+  }
+
+  return fallback;
 }
 
 function update(time) {
@@ -1212,6 +1627,7 @@ function handleInput(dt) {
 
   if (rotate !== 0) {
     p.angle = wrapAngle(p.angle + rotate * rotateSpeed * dt);
+    p.turretAngle = p.angle;
   }
 
   if (moveDir !== 0) {
@@ -1235,15 +1651,32 @@ function updatePlayerRespawn(dt) {
 }
 
 function updateEnemies(dt) {
+  const enemyFireChance = game.oneLife ? 0.16 : 0.2;
   for (const e of game.enemies) {
     tickTankTimers(e, dt);
     if (!e.alive) continue;
+    const prevX = e.x;
+    const prevY = e.y;
+    e.ai.stuckTime = e.ai.stuckTime ?? 0;
+    e.ai.lingerTime = e.ai.lingerTime ?? 0;
+    e.ai.lingerCenter = e.ai.lingerCenter ?? { x: e.x, y: e.y };
+    e.ai.wallHugTime = e.ai.wallHugTime ?? 0;
+    e.ai.lingerBreakTimer = Math.max(0, (e.ai.lingerBreakTimer ?? 0) - dt);
+    e.ai.noProgress = Math.max(0, (e.ai.noProgress ?? 0) - dt * 0.5);
+    e.ai.contactTime = Math.max(0, (e.ai.contactTime ?? 0) - dt * 0.6);
     e.ai.changeTimer -= dt;
+    const inLingerBreak = e.ai.lingerBreakTimer > 0;
 
     const playerAlive = game.player.alive && !game.gameOver;
     const distToPlayer = playerAlive ? Math.hypot(game.player.x - e.x, game.player.y - e.y) : Infinity;
     const chase = playerAlive && distToPlayer < 320;
-    if (e.ai.changeTimer <= 0) {
+    const desiredRange = 80;
+    const tooClose = playerAlive && distToPlayer < desiredRange;
+    e.ai.backoffTimer = Math.max(0, (e.ai.backoffTimer ?? 0) - dt);
+    const backoffing = e.ai.backoffTimer > 0;
+    let desiredTurret = e.turretAngle ?? e.angle;
+    let shouldShoot = false;
+    if (!inLingerBreak && e.ai.changeTimer <= 0) {
       if (chase) {
         const dx = game.player.x - e.x;
         const dy = game.player.y - e.y;
@@ -1252,6 +1685,9 @@ function updateEnemies(dt) {
         e.ai.targetAngle = Math.random() * Math.PI * 2;
       }
       e.ai.changeTimer = (chase ? 0.4 : 0.8) + Math.random() * (chase ? 0.5 : 0.8);
+    } else if (inLingerBreak) {
+      // Hold the course a bit during break to避免重新随机导致兜圈。
+      e.ai.changeTimer = Math.max(e.ai.changeTimer, 0.12);
     }
 
     if (!chase) {
@@ -1262,6 +1698,18 @@ function updateEnemies(dt) {
         e.ai.targetAngle = Math.atan2(canvas.height / 2 - e.y, canvas.width / 2 - e.x);
         e.ai.changeTimer = 0.3;
       }
+    }
+
+    if (tooClose && !backoffing) {
+      // Enter short backoff mode to avoid抖动; prioritize moving away from player.
+      e.ai.backoffTimer = 0.5;
+    }
+
+    if (backoffing && playerAlive) {
+      const away = Math.atan2(e.y - game.player.y, e.x - game.player.x);
+      const jitter = (Math.random() * 0.3 - 0.15);
+      e.ai.targetAngle = away + jitter;
+      e.ai.changeTimer = Math.min(e.ai.changeTimer, 0.15);
     }
 
     let pushX = 0;
@@ -1280,27 +1728,204 @@ function updateEnemies(dt) {
       e.ai.changeTimer = Math.min(e.ai.changeTimer, 0.25);
     }
 
-    const avoidDist = Math.max(64, e.speed * dt * 3.5);
+    // Continuous steering vector：指向玩家/中心 + 近墙斥力，减少来回抖动/兜圈。
+    const goalAng = playerAlive
+      ? Math.atan2(game.player.y - e.y, game.player.x - e.x)
+      : Math.atan2(canvas.height / 2 - e.y, canvas.width / 2 - e.x);
+    let steerX = Math.cos(goalAng);
+    let steerY = Math.sin(goalAng);
+    const wallRepulseRange = tile * 1.05;
+    for (const w of walls) {
+      const cx = clamp(e.x, w.x, w.x + w.w);
+      const cy = clamp(e.y, w.y, w.y + w.h);
+      const dx = e.x - cx;
+      const dy = e.y - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist < wallRepulseRange) {
+        const strength = (wallRepulseRange - dist) / wallRepulseRange;
+        const len = dist || 1;
+        steerX += (dx / len) * strength * 1.1;
+        steerY += (dy / len) * strength * 1.1;
+      }
+    }
+    // Border repulse (lighter to avoid挤出窄路)
+    const borderPad = tile * 0.8;
+    if (e.x < borderPad) steerX += (1 - e.x / borderPad) * 1.0;
+    if (canvas.width - e.x < borderPad) steerX -= (1 - (canvas.width - e.x) / borderPad) * 1.0;
+    if (e.y < borderPad) steerY += (1 - e.y / borderPad) * 1.0;
+    if (canvas.height - e.y < borderPad) steerY -= (1 - (canvas.height - e.y) / borderPad) * 1.0;
+
+    const steerLen = Math.hypot(steerX, steerY) || 1;
+    const steerAng = Math.atan2(steerY, steerX);
+    const needSteer = steerLen > 0.75 || e.ai.lingerTime > 1.2;
+    if (needSteer) {
+      e.ai.targetAngle = bestOpenAngle(e, steerAng);
+      e.ai.changeTimer = Math.min(e.ai.changeTimer, 0.22);
+    }
+
+    const avoidDist = Math.max(96, e.speed * dt * 4);
     if (willHitWall(e, e.ai.targetAngle ?? e.angle, avoidDist)) {
-      e.ai.targetAngle = findClearAngle(e, e.ai.targetAngle ?? e.angle, avoidDist);
+      e.ai.targetAngle = bestOpenAngle(e, e.ai.targetAngle ?? e.angle);
       e.ai.changeTimer = 0.35;
     }
 
     const diff = wrapAngle(e.ai.targetAngle - e.angle);
     e.angle += clamp(diff, -2.5 * dt, 2.5 * dt);
 
-    const mv = { x: Math.cos(e.angle) * e.speed * dt, y: Math.sin(e.angle) * e.speed * dt };
+    const speedScale = backoffing
+      ? 1.05
+      : tooClose
+      ? clamp(distToPlayer / desiredRange, 0.35, 1)
+      : 1;
+    const mv = { x: Math.cos(e.angle) * e.speed * dt * speedScale, y: Math.sin(e.angle) * e.speed * dt * speedScale };
     const moved = moveTank(e, mv.x, mv.y);
-    if (Math.hypot(moved.dx, moved.dy) < 1.5) {
-      // If stuck (e.g., blocked by a wall), quickly pick a new direction.
-      const turn = (Math.random() * 0.8 + 0.6) * (Math.random() < 0.5 ? 1 : -1);
-      e.ai.targetAngle = wrapAngle(e.angle + turn);
+    const movedLen = Math.hypot(moved.dx, moved.dy);
+    const frameMoved = Math.hypot(e.x - prevX, e.y - prevY);
+    if (frameMoved < 1.2) {
+      e.ai.noProgress += dt;
+    } else {
+      e.ai.noProgress = Math.max(0, e.ai.noProgress - dt * 1.5);
+    }
+    const nearWall = willHitWall(e, e.angle, tile * 0.9);
+    if (movedLen < 1.5 || nearWall) {
+      e.ai.stuckTime += dt;
+      // If stuck or nudging a wall, pick a clear angle away from obstacles (prefer deterministic clear angle over random).
+      e.ai.targetAngle = bestOpenAngle(e, e.ai.targetAngle ?? e.angle);
+      e.ai.changeTimer = 0.14;
+    } else {
+      e.ai.stuckTime = Math.max(0, e.ai.stuckTime - dt * 0.5);
+    }
+
+    // Wall-hug detection: if staying close to a wall for too long, force a turn away.
+    const wallInfo = nearestWallNormal(e.x, e.y);
+    if (wallInfo.dist < 48) {
+      e.ai.wallHugTime += dt;
+    } else {
+      e.ai.wallHugTime = Math.max(0, e.ai.wallHugTime - dt);
+    }
+
+    const touchingEnemy = game.enemies.some(
+      (o) => o !== e && o.alive && Math.hypot(o.x - e.x, o.y - e.y) < e.size * 0.95
+    );
+    if (touchingEnemy) {
+      e.ai.contactTime += dt;
+    }
+
+    if (e.ai.contactTime > 0.45 && wallInfo.dist < 22) {
+      const tang1 = Math.atan2(-wallInfo.nx, wallInfo.ny);
+      const tang2 = Math.atan2(wallInfo.nx, -wallInfo.ny);
+      const d1 = raycastClearDistance(e, tang1);
+      const d2 = raycastClearDistance(e, tang2);
+      const along = d1 >= d2 ? tang1 : tang2;
+      e.ai.targetAngle = bestOpenAngle(e, along);
+      e.ai.changeTimer = 0.12;
+      e.ai.backoffTimer = Math.max(e.ai.backoffTimer ?? 0, 0.35);
+      e.ai.contactTime = 0;
+    }
+
+    const lingerRadius = 72;
+    const distFromLinger = Math.hypot(e.x - e.ai.lingerCenter.x, e.y - e.ai.lingerCenter.y);
+    if (distFromLinger < lingerRadius) {
+      e.ai.lingerTime += dt;
+    } else {
+      e.ai.lingerCenter = { x: e.x, y: e.y };
+      e.ai.lingerTime = 0;
+    }
+
+    if (e.ai.stuckTime > 0.6) {
+      const escape = Math.atan2(canvas.height / 2 - e.y, canvas.width / 2 - e.x) + (Math.random() * 0.6 - 0.3);
+      e.ai.targetAngle = bestOpenAngle(e, escape);
+      e.ai.changeTimer = 0.12;
+      e.ai.backoffTimer = Math.max(e.ai.backoffTimer ?? 0, 0.45);
+    }
+
+    if (e.ai.noProgress > 0.9) {
+      const escape = Math.atan2(canvas.height / 2 - e.y, canvas.width / 2 - e.x) + (Math.random() * 0.5 - 0.25);
+      e.ai.targetAngle = bestOpenAngle(e, escape);
+      e.ai.changeTimer = 0.16;
+      e.ai.backoffTimer = Math.max(e.ai.backoffTimer ?? 0, 0.4);
+      e.ai.noProgress = 0;
+      e.ai.lingerBreakTimer = 0.6;
+    }
+
+    // Hard nudge away from nearby wall if we keep not moving.
+    const stuckNow = movedLen < 0.3 || frameMoved < 0.3;
+    const shallowWall = wallInfo.dist < 14;
+    if ((e.ai.noProgress > 1 || e.ai.stuckTime > 1 || stuckNow) && shallowWall) {
+      if (nudgeTankAway(e, wallInfo, 10)) {
+        e.ai.noProgress = 0;
+        e.ai.stuckTime = Math.max(0, e.ai.stuckTime - 0.5);
+        e.ai.changeTimer = 0.14;
+      }
+    }
+
+    const circling =
+      e.ai.lingerTime > 2.4 &&
+      distToPlayer > desiredRange * 0.8 &&
+      Math.hypot(e.x - canvas.width / 2, e.y - canvas.height / 2) > tile * 0.5;
+    if (circling) {
+      const escapeTarget = playerAlive
+        ? Math.atan2(game.player.y - e.y, game.player.x - e.x)
+        : Math.atan2(canvas.height / 2 - e.y, canvas.width / 2 - e.x);
+      e.ai.targetAngle = bestOpenAngle(e, escapeTarget + (Math.random() * 0.8 - 0.4));
       e.ai.changeTimer = 0.15;
+      e.ai.backoffTimer = Math.max(e.ai.backoffTimer ?? 0, 0.35);
+      e.ai.lingerCenter = { x: e.x, y: e.y };
+      e.ai.lingerTime = 0;
+    }
+
+    if (e.ai.wallHugTime > 0.5 && wallInfo.dist < 48) {
+      const awayFromWall = Math.atan2(wallInfo.ny, wallInfo.nx);
+      // move slightly diagonally away to reduce lateral oscillation
+      const jitter = Math.random() * 0.4 - 0.2;
+      e.ai.targetAngle = bestOpenAngle(e, awayFromWall + jitter);
+      e.ai.changeTimer = 0.12;
+      e.ai.backoffTimer = Math.max(e.ai.backoffTimer ?? 0, 0.4);
+      e.ai.wallHugTime = 0;
+    }
+
+    // If lingering in a pocket, force a blended escape toward目标并远离最近墙。
+    if (e.ai.lingerTime > 1.8 && e.ai.lingerBreakTimer <= 0) {
+      const toPlayer = playerAlive
+        ? Math.atan2(game.player.y - e.y, game.player.x - e.x)
+        : Math.atan2(canvas.height / 2 - e.y, canvas.width / 2 - e.x);
+      const wallDir = Math.atan2(wallInfo.ny, wallInfo.nx);
+      // blend toward player but add wall normal to avoid sideways loops
+      const vx = Math.cos(toPlayer) * 1.2 + Math.cos(wallDir) * 0.8;
+      const vy = Math.sin(toPlayer) * 1.2 + Math.sin(wallDir) * 0.8;
+      const blended = Math.atan2(vy, vx);
+      e.ai.targetAngle = bestOpenAngle(e, blended + (Math.random() * 0.4 - 0.2));
+      e.ai.changeTimer = 0.22;
+      e.ai.backoffTimer = Math.max(e.ai.backoffTimer ?? 0, 0.35);
+      e.ai.lingerCenter = { x: e.x, y: e.y };
+      e.ai.lingerTime = 0;
+      e.ai.lingerBreakTimer = 1.1; // hold this course briefly to避免继续原地兜圈
     }
 
     if (playerAlive && hasLineOfSight(e.x, e.y, game.player.x, game.player.y)) {
-      e.angle = Math.atan2(game.player.y - e.y, game.player.x - e.x);
-      if (canShoot(e) && distToPlayer < 500 && Math.random() < 0.2) {
+      const aimAngle = Math.atan2(game.player.y - e.y, game.player.x - e.x);
+      desiredTurret = aimAngle;
+      const stucking = e.ai.stuckTime > 0.35 || e.ai.backoffTimer > 0;
+      if (!stucking) {
+        e.angle = aimAngle;
+      }
+      if (canShoot(e) && distToPlayer < 500 && Math.random() < enemyFireChance) {
+        shouldShoot = true;
+      }
+    } else {
+      desiredTurret = e.ai.targetAngle ?? e.angle;
+    }
+
+    // Smooth turret rotation independent of body to avoid “shoot before turning” visuals.
+    const turretTurnRate = 6; // radians/sec
+    const currTurret = e.turretAngle ?? e.angle;
+    const deltaTurret = wrapAngle(desiredTurret - currTurret);
+    const maxTurretStep = turretTurnRate * dt;
+    e.turretAngle = currTurret + clamp(deltaTurret, -maxTurretStep, maxTurretStep);
+
+    if (shouldShoot) {
+      const aligned = Math.abs(wrapAngle(desiredTurret - e.turretAngle)) < 0.3; // about 17°
+      if (aligned) {
         shoot(e);
       }
     }
@@ -1309,20 +1934,24 @@ function updateEnemies(dt) {
 
 function shoot(tank) {
   if (!tank.alive) return;
-  if (tank.reloadTimer > 0) return;
-  if (tank.ammo <= 0) {
-    tank.reloadTimer = tank.reloadTime;
-    return;
-  }
-  if (tank.fireCooldown > 0) return;
-  const speed = 420;
-  const isLaser = tank.isPlayer && tank.laserTimer > 0;
+  const angle = tank.turretAngle ?? tank.angle;
+  const isLaser = tank.isPlayer && tank.laserAmmo > 0;
   const useCannon = tank.isPlayer && tank.cannonAmmo > 0 && !isLaser;
   const useMissile = tank.isPlayer && tank.missileAmmo > 0 && !isLaser && !useCannon;
   const useMine = tank.isPlayer && tank.mineAmmo > 0 && !isLaser && !useCannon && !useMissile;
+  const useSpecial = isLaser || useCannon || useMissile || useMine;
+
+  if (!useSpecial) {
+    if (tank.reloadTimer > 0) return;
+    if (tank.ammo <= 0) {
+      tank.reloadTimer = tank.reloadTime;
+      return;
+    }
+  }
+  if (tank.fireCooldown > 0) return;
+  const speed = 420;
   // Spawn muzzle a bit farther to avoid colliding with the shooter on spawn.
   const offset = tank.size * 0.8;
-  const angle = tank.angle;
   const spawnX = tank.x + Math.cos(angle) * offset;
   const spawnY = tank.y + Math.sin(angle) * offset;
   let firedMissile = false;
@@ -1341,6 +1970,7 @@ function shoot(tank) {
       type: "laserBeam",
       pierceWalls: true,
     });
+    tank.laserAmmo = Math.max(0, tank.laserAmmo - 1); // consume one charge
   } else if (useCannon) {
     game.bullets.push({
       x: spawnX,
@@ -1399,9 +2029,11 @@ function shoot(tank) {
     playShootSound();
   }
   tank.fireCooldown = tank.fireRate;
-  tank.ammo -= 1;
-  if (tank.ammo <= 0) {
-    tank.reloadTimer = tank.reloadTime;
+  if (!useSpecial) {
+    tank.ammo -= 1;
+    if (tank.ammo <= 0) {
+      tank.reloadTimer = tank.reloadTime;
+    }
   }
 }
 
@@ -1419,14 +2051,28 @@ function killPlayer(opts = {}) {
   game.player.deathTimer = 0.6;
   if (game.lives <= 0) {
     game.gameOver = true;
-    game.status = "遗憾落败";
+    game.status = game.oneLife ? "一命挑战失败" : "遗憾落败";
     game.respawnTimer = 0;
-    showModal({
-      title: "遗憾！生命耗尽",
-      desc: `你在第 ${game.level} 关耗尽生命。点击“重试”重新开始本关。`,
-      buttonText: "重试",
-      action: "retryLevel",
-    });
+    if (game.oneLife) {
+      stopBgm();
+      showModal({
+        title: "遗憾！一命挑战失败",
+        desc: `你在第 ${game.level} 关失利，点击确认返回模式选择。`,
+        buttonText: "返回模式选择",
+        action: "backToModeSelect",
+        actionStatus: "选择模式重新挑战",
+      });
+    } else {
+      showModal({
+        title: "遗憾！生命耗尽",
+        desc: `你在第 ${game.level} 关耗尽生命。点击“重试”重新开始本关。`,
+        buttonText: "重试",
+        action: "retryLevel",
+        secondaryText: "返回皮肤选择",
+        secondaryAction: "backToModeSelect",
+        secondaryActionStatus: "返回皮肤选择，重新装扮后再战",
+      });
+    }
   } else {
     game.respawnTimer = 1.2;
     game.status = "你被击中，准备复活";
@@ -1685,7 +2331,7 @@ function updatePowerups(dt) {
   const maxPowerups = 3;
   if (!game.gameOver && game.powerups.length < maxPowerups && game.powerupTimer <= 0) {
     spawnPowerup();
-    game.powerupTimer = 7 + Math.random() * 5;
+    game.powerupTimer = powerupRespawnDelay();
   }
 
   game.enemies = game.enemies.filter((e) => e.alive || (e.deathTimer ?? 0) > 0);
@@ -1758,11 +2404,11 @@ function applyPowerup(type) {
       game.status = "生命 +1";
       break;
     case "laser":
-      p.laserTimer = 8;
-      game.status = "激光弹药就绪";
+      p.laserAmmo = 1; // 单发激光，持续存储直到使用
+      game.status = "激光弹药就绪（无限时效）";
       break;
     case "cannon":
-      p.cannonAmmo = 3;
+      p.cannonAmmo = 2;
       game.status = "炮弹已装填";
       break;
     case "mine":
@@ -1770,7 +2416,7 @@ function applyPowerup(type) {
       game.status = "地雷可用";
       break;
     case "missile":
-      p.missileAmmo = 4;
+      p.missileAmmo = 2;
       game.status = "导弹锁定就绪";
       break;
     default:
@@ -1866,6 +2512,11 @@ function moveTank(tank, dx, dy) {
       nx = tank.x;
       ny = tank.y;
       rect = { x: tank.x - w / 2, y: tank.y - h / 2, w, h };
+      // Corner deadlock: try a small nudge away from nearest wall.
+      const normal = nearestWallNormal(tank.x, tank.y);
+      if (normal.dist < tile * 0.6) {
+        nudgeTankAway(tank, normal, 8);
+      }
     }
   }
 
@@ -1886,7 +2537,46 @@ function moveTank(tank, dx, dy) {
     }
   }
 
+  // Avoid sitting inside the player (prevents抖动/重叠)
+  if (!tank.isPlayer && game.player && game.player.alive && tankTouches(tank, game.player)) {
+    const dxp = tank.x - game.player.x || (Math.random() * 2 - 1) * 0.01;
+    const dyp = tank.y - game.player.y || (Math.random() * 2 - 1) * 0.01;
+    const len = Math.hypot(dxp, dyp) || 1;
+    const push = 10;
+    const nxp = clamp(tank.x + (dxp / len) * push, w / 2, canvas.width - w / 2);
+    const nyp = clamp(tank.y + (dyp / len) * push, h / 2, canvas.height - h / 2);
+    const rectP = { x: nxp - w / 2, y: nyp - h / 2, w, h };
+    if (!collidesWalls(rectP)) {
+      tank.x = nxp;
+      tank.y = nyp;
+    }
+  }
+
   return { dx: tank.x - beforeX, dy: tank.y - beforeY };
+}
+
+function nudgeTankAway(tank, normal, dist = 14) {
+  const w = tank.size;
+  const h = tank.size;
+  const tryMove = (vx, vy) => {
+    const nx = clamp(tank.x + vx, w / 2, canvas.width - w / 2);
+    const ny = clamp(tank.y + vy, h / 2, canvas.height - h / 2);
+    const rect = { x: nx - w / 2, y: ny - h / 2, w, h };
+    if (!collidesWalls(rect)) {
+      tank.x = nx;
+      tank.y = ny;
+      return true;
+    }
+    return false;
+  };
+  // Push directly away from the nearest wall.
+  if (tryMove(normal.nx * dist, normal.ny * dist)) return true;
+  // Try diagonals to slide out of corners.
+  const perp1 = { nx: -normal.ny, ny: normal.nx };
+  const perp2 = { nx: normal.ny, ny: -normal.nx };
+  if (tryMove((normal.nx + perp1.nx) * dist * 0.7, (normal.ny + perp1.ny) * dist * 0.7)) return true;
+  if (tryMove((normal.nx + perp2.nx) * dist * 0.7, (normal.ny + perp2.ny) * dist * 0.7)) return true;
+  return false;
 }
 
 function tanksCollide(temp, list) {
@@ -1897,7 +2587,6 @@ function tickTankTimers(tank, dt) {
   if (!tank) return;
   if (tank.spawnShield > 0) tank.spawnShield -= dt;
   if (tank.powerShieldTimer > 0) tank.powerShieldTimer = Math.max(0, tank.powerShieldTimer - dt);
-  if (tank.laserTimer > 0) tank.laserTimer = Math.max(0, tank.laserTimer - dt);
   if (tank.cannonAmmo < 0) tank.cannonAmmo = 0;
   if (tank.mineAmmo < 0) tank.mineAmmo = 0;
   if (tank.missileAmmo < 0) tank.missileAmmo = 0;
@@ -1971,6 +2660,55 @@ function willHitWall(tank, angle, dist) {
   const rect = { x: nx - size / 2, y: ny - size / 2, w: size, h: size };
   const hitsBounds = rect.x < 0 || rect.y < 0 || rect.x + rect.w > canvas.width || rect.y + rect.h > canvas.height;
   return hitsBounds || collidesWalls(rect);
+}
+
+function nearestWallNormal(x, y) {
+  let minDist = Math.min(x, canvas.width - x, y, canvas.height - y);
+  let best = { nx: 0, ny: 0, dist: minDist };
+  if (minDist === x) best = { nx: 1, ny: 0, dist: minDist };
+  else if (minDist === canvas.width - x) best = { nx: -1, ny: 0, dist: minDist };
+  else if (minDist === y) best = { nx: 0, ny: 1, dist: minDist };
+  else if (minDist === canvas.height - y) best = { nx: 0, ny: -1, dist: minDist };
+
+  for (const w of walls) {
+    const cx = clamp(x, w.x, w.x + w.w);
+    const cy = clamp(y, w.y, w.y + w.h);
+    const dx = x - cx;
+    const dy = y - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist < minDist) {
+      minDist = dist;
+      const len = dist || 1;
+      best = { nx: dx / len, ny: dy / len, dist };
+    }
+  }
+  return best;
+}
+
+function raycastClearDistance(tank, ang, maxDist = tile * 4, step = tile * 0.35) {
+  for (let d = step; d <= maxDist; d += step) {
+    if (willHitWall(tank, ang, d)) {
+      return d - step;
+    }
+  }
+  return maxDist;
+}
+
+function bestOpenAngle(tank, preferred) {
+  const samples = 24;
+  let bestAng = preferred;
+  let bestScore = -Infinity;
+  for (let i = 0; i < samples; i++) {
+    const ang = wrapAngle((Math.PI * 2 * i) / samples);
+    const dist = raycastClearDistance(tank, ang);
+    const angPenalty = Math.abs(wrapAngle(ang - preferred));
+    const score = dist - angPenalty * tile * 0.2;
+    if (score > bestScore) {
+      bestScore = score;
+      bestAng = ang;
+    }
+  }
+  return wrapAngle(bestAng);
 }
 
 function findClearAngle(tank, preferred, dist) {
@@ -2251,7 +2989,7 @@ function draw() {
   drawIngameCounters();
   drawPlayer();
   drawEnemies();
-  if (game.gameOver && !game.modalAction) {
+  if (game.gameOver && !game.modalAction && !game.modalSecondaryAction) {
     drawOverlay("游戏结束", "按 R 重试本关");
   }
 }
@@ -2339,7 +3077,7 @@ function drawPowerups() {
     laser: { fill: "rgba(200,160,255,0.18)", stroke: "#c592ff" },
     cannon: { fill: "rgba(255,204,140,0.2)", stroke: "#ffb36b" },
     mine: { fill: "rgba(120,220,200,0.2)", stroke: "#6de0c1" },
-    missile: { fill: "rgba(255,255,255,0.2)", stroke: "#ffd27f" },
+    missile: { fill: "rgba(67,255,158,0.18)", stroke: missileColor },
   };
 
   for (const p of game.powerups) {
@@ -2427,22 +3165,69 @@ function drawPowerupGlyph(type, r) {
       break;
     }
     case "missile": {
-      ctx.strokeStyle = "#ffd27f";
-      ctx.fillStyle = "rgba(255,210,127,0.35)";
+      // Make missile visually distinct from bullet/cannon: neon-green body + magenta accents.
+      const bodyW = r * 0.55;
+      const bodyH = r * 1.35;
+      const bodyY = -bodyH * 0.15;
+      const noseY = -bodyH * 0.75;
+      const bodyTop = bodyY - bodyH * 0.45;
+      const bodyBottom = bodyY + bodyH * 0.5;
+
+      // Body capsule
       ctx.lineWidth = 2;
+      ctx.strokeStyle = missileColor;
+      ctx.fillStyle = "rgba(67,255,158,0.26)";
+      drawRoundedRectPath(ctx, -bodyW / 2, bodyTop, bodyW, bodyH * 0.95, bodyW * 0.45);
+      ctx.fill();
+      ctx.stroke();
+
+      // Nose cone
+      ctx.fillStyle = missileDarkColor;
+      ctx.strokeStyle = missileColor;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.55, 0);
-      ctx.lineTo(0, -r * 0.7);
-      ctx.lineTo(r * 0.55, 0);
-      ctx.lineTo(0, r * 0.7);
+      ctx.moveTo(0, noseY);
+      ctx.lineTo(bodyW * 0.55, bodyTop + bodyH * 0.18);
+      ctx.lineTo(-bodyW * 0.55, bodyTop + bodyH * 0.18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Fins
+      ctx.strokeStyle = missileAccentColor;
+      ctx.fillStyle = "rgba(255,79,184,0.5)";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-bodyW / 2, bodyBottom - bodyH * 0.2);
+      ctx.lineTo(-bodyW * 0.95, bodyBottom);
+      ctx.lineTo(-bodyW / 2, bodyBottom + bodyH * 0.08);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(-r * 0.14, r * 0.7);
-      ctx.lineTo(0, r * 0.98);
-      ctx.lineTo(r * 0.14, r * 0.7);
+      ctx.moveTo(bodyW / 2, bodyBottom - bodyH * 0.2);
+      ctx.lineTo(bodyW * 0.95, bodyBottom);
+      ctx.lineTo(bodyW / 2, bodyBottom + bodyH * 0.08);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
+
+      // Exhaust flame
+      ctx.strokeStyle = missileAccentColor;
+      ctx.fillStyle = "rgba(255,79,184,0.35)";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-bodyW * 0.22, bodyBottom + bodyH * 0.12);
+      ctx.lineTo(0, bodyBottom + bodyH * 0.45);
+      ctx.lineTo(bodyW * 0.22, bodyBottom + bodyH * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Small "window"/lock point
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.beginPath();
+      ctx.arc(0, bodyTop + bodyH * 0.3, r * 0.09, 0, Math.PI * 2);
+      ctx.fill();
       break;
     }
     case "mine":
@@ -2490,16 +3275,124 @@ function drawTank(tank) {
   const { x, y, angle, size } = tank;
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.fillStyle = tank.color;
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+  const bodyAngle = angle ?? 0;
+  const turretAngle = tank.turretAngle ?? bodyAngle;
+  ctx.rotate(bodyAngle);
   const w = size;
   const h = size * 0.7;
+  const skin = tank.skin ?? "default";
+  const accent = tank.accentColor ?? tank.turretColor ?? tank.color;
+  const detail = tank.detailColor ?? "#161722";
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
+
+  // Base fill (allow simple gradients per皮肤)
+  if (skin === "split") {
+    const g = ctx.createLinearGradient(-w / 2, -h / 2, -w / 2, h / 2);
+    g.addColorStop(0, hexToRgba(accent, 0.5));
+    g.addColorStop(0.55, tank.color);
+    ctx.fillStyle = g;
+  } else if (skin === "vanguard") {
+    const g = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+    g.addColorStop(0, hexToRgba(tank.color, 0.95));
+    g.addColorStop(1, hexToRgba(accent, 0.55));
+    ctx.fillStyle = g;
+  } else if (skin === "prism") {
+    const g = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+    g.addColorStop(0, hexToRgba(tank.color, 0.9));
+    g.addColorStop(0.5, hexToRgba(accent, 0.75));
+    g.addColorStop(1, hexToRgba("#6fffff", 0.8));
+    ctx.fillStyle = g;
+  } else if (skin === "royal") {
+    const g = ctx.createLinearGradient(-w / 2, h / 2, w / 2, -h / 2);
+    g.addColorStop(0, hexToRgba(tank.color, 0.9));
+    g.addColorStop(0.6, hexToRgba(accent, 0.65));
+    g.addColorStop(1, hexToRgba("#fff5c0", 0.8));
+    ctx.fillStyle = g;
+  } else {
+    ctx.fillStyle = tank.color;
+  }
   ctx.fillRect(-w / 2, -h / 2, w, h);
   ctx.strokeRect(-w / 2, -h / 2, w, h);
-  ctx.fillStyle = "#161722";
+
+  // Accent patterns per皮肤
+  if (skin === "panel") {
+    ctx.strokeStyle = hexToRgba(accent, 0.3);
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-w / 2 + 4, 0);
+    ctx.lineTo(w / 2 - 4, 0);
+    ctx.moveTo(-w / 2 + 8, -h / 2 + 6);
+    ctx.lineTo(-w / 2 + 8, h / 2 - 6);
+    ctx.moveTo(w / 2 - 8, -h / 2 + 6);
+    ctx.lineTo(w / 2 - 8, h / 2 - 6);
+    ctx.stroke();
+  } else if (skin === "stripe") {
+    ctx.save();
+    ctx.translate(0, 0);
+    ctx.rotate(-Math.PI / 9);
+    ctx.fillStyle = hexToRgba(accent, 0.35);
+    ctx.fillRect(-w * 0.7, -h * 0.15, w * 1.4, h * 0.3);
+    ctx.fillStyle = hexToRgba(accent, 0.18);
+    ctx.fillRect(-w * 0.7, -h * 0.4, w * 1.4, h * 0.18);
+    ctx.restore();
+  } else if (skin === "vanguard") {
+    ctx.fillStyle = hexToRgba(accent, 0.25);
+    ctx.fillRect(-w / 2, -h / 2, w * 0.2, h);
+    ctx.fillRect(w / 2 - w * 0.2, -h / 2, w * 0.2, h);
+    ctx.fillRect(-w * 0.18, h * 0.05, w * 0.36, h * 0.4);
+  } else if (skin === "prism") {
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = hexToRgba("#b48bff", 0.4);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.25, -h * 0.15);
+    ctx.lineTo(w * 0.05, -h * 0.45);
+    ctx.lineTo(w * 0.35, -h * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = hexToRgba("#5ecbff", 0.35);
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.05, h * 0.45);
+    ctx.lineTo(w * 0.32, h * 0.1);
+    ctx.lineTo(w * 0.6, h * 0.48);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = hexToRgba(accent, 0.35);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-w / 2 + 4, -h / 2 + 4, w - 8, h - 8);
+  } else if (skin === "rogue") {
+    const glow = accent ?? "#ffe17a";
+    ctx.strokeStyle = hexToRgba(glow, 0.5);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6);
+    ctx.fillStyle = hexToRgba(glow, 0.12);
+    ctx.fillRect(-w * 0.18, -h * 0.25, w * 0.36, h * 0.5);
+  } else if (skin === "royal") {
+    ctx.strokeStyle = hexToRgba("#fff5c0", 0.55);
+    ctx.lineWidth = 2.2;
+    ctx.strokeRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6);
+    ctx.fillStyle = hexToRgba(accent, 0.22);
+    ctx.fillRect(-w * 0.14, -h * 0.12, w * 0.28, h * 0.7);
+    ctx.fillStyle = hexToRgba("#fff5c0", 0.35);
+    ctx.fillRect(-w * 0.26, h * 0.12, w * 0.52, h * 0.16);
+  }
+
+  // Hatch
+  ctx.fillStyle = detail;
   ctx.fillRect(-w * 0.2, -h * 0.2, w * 0.4, h * 0.4);
+  // Player-only glow halo for更华丽观感
+  if (tank.isPlayer) {
+    ctx.strokeStyle = hexToRgba(accent, 0.28);
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect?.(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8, 8);
+    ctx.stroke();
+  }
+  ctx.save();
+  ctx.rotate(turretAngle - bodyAngle);
   drawTurret(tank, w, h);
+  ctx.restore();
   ctx.restore();
 
   if (tank.spawnShield > 0 && tank.alive) {
@@ -2580,7 +3473,7 @@ function drawDeathEffect(entity) {
 
 function turretMode(tank) {
   if (tank.isPlayer) {
-    if (tank.laserTimer > 0) return "laser";
+    if (tank.laserAmmo > 0) return "laser";
     if (tank.cannonAmmo > 0) return "cannon";
     if (tank.missileAmmo > 0) return "missile";
     if (tank.mineAmmo > 0) return "mine";
@@ -2591,75 +3484,165 @@ function turretMode(tank) {
 function drawTurret(tank, w, h) {
   const mode = turretMode(tank);
   const barrelY = 0;
+  ctx.save();
   switch (mode) {
     case "laser": {
-      ctx.fillStyle = "#c592ff";
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2;
-      drawRoundedRectPath(ctx, w * 0.1, barrelY - 4, w * 0.65, 8, 3);
+      const railG = ctx.createLinearGradient(w * 0.05, barrelY, w * 0.78, barrelY);
+      railG.addColorStop(0, "#1c1238");
+      railG.addColorStop(1, "#704dff");
+      ctx.fillStyle = railG;
+      ctx.strokeStyle = hexToRgba("#ffffff", 0.6);
+      ctx.lineWidth = 2.4;
+      drawRoundedRectPath(ctx, w * 0.05, barrelY - 6, w * 0.72, 12, 5);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.arc(w * 0.75, barrelY, 3, 0, Math.PI * 2);
+
+      const coreG = ctx.createLinearGradient(w * 0.12, barrelY, w * 0.74, barrelY);
+      coreG.addColorStop(0, hexToRgba(laserColor, 0.1));
+      coreG.addColorStop(0.4, hexToRgba(laserColor, 0.55));
+      coreG.addColorStop(1, "#ffffff");
+      ctx.fillStyle = coreG;
+      ctx.shadowColor = laserColor;
+      ctx.shadowBlur = 14;
+      drawRoundedRectPath(ctx, w * 0.14, barrelY - 3.5, w * 0.55, 7, 3);
       ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = laserColor;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(w * 0.79, barrelY, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
       break;
     }
     case "cannon": {
-      ctx.fillStyle = "#ffdd99";
-      ctx.strokeStyle = "rgba(0,0,0,0.35)";
-      ctx.lineWidth = 2;
-      drawRoundedRectPath(ctx, w * 0.05, barrelY - 6, w * 0.55, 12, 4);
+      const steel = ctx.createLinearGradient(w * 0.04, barrelY, w * 0.68, barrelY);
+      steel.addColorStop(0, "#3b2d17");
+      steel.addColorStop(0.45, "#ffdd99");
+      steel.addColorStop(1, "#c4742a");
+      ctx.fillStyle = steel;
+      ctx.strokeStyle = "rgba(0,0,0,0.45)";
+      ctx.lineWidth = 2.4;
+      drawRoundedRectPath(ctx, w * 0.04, barrelY - 7, w * 0.68, 14, 5);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#ffb36b";
+
+      ctx.fillStyle = hexToRgba("#ffb36b", 0.65);
+      drawRoundedRectPath(ctx, w * 0.12, barrelY - 3.5, w * 0.5, 7, 3);
+      ctx.fill();
+
+      ctx.strokeStyle = "#ffc868";
+      ctx.lineWidth = 2.6;
       ctx.beginPath();
-      ctx.arc(w * 0.6, barrelY, 5, 0, Math.PI * 2);
+      ctx.arc(w * 0.7, barrelY, 6, -Math.PI / 6, Math.PI / 6);
+      ctx.stroke();
+
+      ctx.fillStyle = hexToRgba("#472b12", 0.4);
+      const vents = 3;
+      for (let i = 0; i < vents; i++) {
+        const t = i / (vents - 1);
+        const vx = w * (0.18 + t * 0.38);
+        drawRoundedRectPath(ctx, vx, barrelY - 2, w * 0.08, 4, 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = "#ffb36b";
+      ctx.strokeStyle = "rgba(0,0,0,0.3)";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(w * 0.08, barrelY, 3, 0, Math.PI * 2);
+      ctx.arc(w * 0.12, barrelY, 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       break;
     }
     case "missile": {
-      ctx.fillStyle = "#ffd27f";
-      ctx.strokeStyle = "#ffffff";
+      // Missile rack: dark pod + neon green missiles, clearly different from bullet/cannon barrels.
       ctx.lineWidth = 2;
-      drawRoundedRectPath(ctx, w * 0.08, barrelY - 5, w * 0.58, 10, 4);
+      const podG = ctx.createLinearGradient(w * 0.06, barrelY - 8, w * 0.74, barrelY + 8);
+      podG.addColorStop(0, hexToRgba("#0b2a22", 0.9));
+      podG.addColorStop(1, hexToRgba("#113a2e", 0.9));
+      ctx.fillStyle = podG;
+      ctx.strokeStyle = missileColor;
+      drawRoundedRectPath(ctx, w * 0.06, barrelY - 8, w * 0.68, 16, 6);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#ff8aa0";
-      ctx.beginPath();
-      ctx.moveTo(w * 0.55, barrelY - 6);
-      ctx.lineTo(w * 0.75, barrelY);
-      ctx.lineTo(w * 0.55, barrelY + 6);
-      ctx.closePath();
-      ctx.fill();
+
+      ctx.strokeStyle = hexToRgba(missileColor, 0.45);
+      ctx.lineWidth = 1.6;
+      drawRoundedRectPath(ctx, w * 0.12, barrelY - 5, w * 0.52, 10, 4);
+      ctx.stroke();
+
+      const slots = 3;
+      for (let i = 0; i < slots; i++) {
+        const t = i / (slots - 1);
+        const mx = w * (0.18 + t * 0.3);
+        ctx.fillStyle = hexToRgba(missileDarkColor, 0.9);
+        ctx.strokeStyle = hexToRgba(missileColor, 0.85);
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(mx, barrelY, 4.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = hexToRgba("#ffffff", 0.75);
+        ctx.beginPath();
+        ctx.arc(mx - 1.2, barrelY, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = missileAccentColor;
+        ctx.beginPath();
+        ctx.moveTo(mx + 4.8, barrelY - 4.4);
+        ctx.lineTo(mx + 8.5, barrelY);
+        ctx.lineTo(mx + 4.8, barrelY + 4.4);
+        ctx.closePath();
+        ctx.fill();
+      }
       break;
     }
     case "mine": {
-      ctx.fillStyle = "#3f2f6b"; // deep purple base
+      const baseG = ctx.createLinearGradient(w * 0.12, barrelY - 6, w * 0.52, barrelY + 6);
+      baseG.addColorStop(0, "#2a203f");
+      baseG.addColorStop(1, "#6046ad");
+      ctx.fillStyle = baseG; // deep purple base
       ctx.strokeStyle = "#9b7cff"; // bright violet accent
-      ctx.lineWidth = 2;
-      drawRoundedRectPath(ctx, w * 0.12, barrelY - 4, w * 0.4, 8, 3);
+      ctx.lineWidth = 2.2;
+      drawRoundedRectPath(ctx, w * 0.12, barrelY - 6, w * 0.5, 12, 4);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#c9b1ff";
+
+      ctx.strokeStyle = "#c9b1ff";
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.arc(w * 0.35, barrelY, 4, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(w * 0.18, barrelY - 4);
+      ctx.lineTo(w * 0.18, barrelY + 4);
+      ctx.moveTo(w * 0.58, barrelY - 4);
+      ctx.lineTo(w * 0.58, barrelY + 4);
+      ctx.stroke();
+
       ctx.fillStyle = "#e6ddff";
       ctx.beginPath();
-      ctx.arc(w * 0.12, barrelY, 3, 0, Math.PI * 2);
-      ctx.arc(w * 0.52, barrelY, 3, 0, Math.PI * 2);
+      ctx.arc(w * 0.38, barrelY, 4.6, 0, Math.PI * 2);
       ctx.fill();
+
+      ctx.strokeStyle = "#6de0c1";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(w * 0.38, barrelY, 7.8, -Math.PI * 0.2, Math.PI * 0.2);
+      ctx.arc(w * 0.38, barrelY, 7.8, Math.PI * 0.8, Math.PI * 1.2);
+      ctx.stroke();
       break;
     }
     default: {
-      ctx.fillStyle = tank.color;
+      ctx.fillStyle = tank.turretColor ?? tank.color;
       drawRoundedRectPath(ctx, w * 0.1, barrelY - 5, w * 0.5, 10, 3);
       ctx.fill();
       break;
     }
   }
+  ctx.restore();
 }
 
 function drawBullets() {
@@ -2721,8 +3704,10 @@ function drawBullets() {
       ctx.rotate(b.rotation ?? 0);
       const bodyLen = (b.r ?? 6) * 2.2;
       const bodyRad = (b.r ?? 6) * 0.7;
-      ctx.fillStyle = "#ffd27f";
-      ctx.strokeStyle = "#ff8aa0";
+      ctx.shadowColor = missileColor;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = missileColor;
+      ctx.strokeStyle = missileAccentColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(-bodyLen * 0.4, -bodyRad);
@@ -2737,7 +3722,7 @@ function drawBullets() {
       ctx.moveTo(-bodyLen * 0.45, -bodyRad * 0.9);
       ctx.lineTo(-bodyLen * 0.8, 0);
       ctx.lineTo(-bodyLen * 0.45, bodyRad * 0.9);
-      ctx.fillStyle = "rgba(255,138,160,0.6)";
+      ctx.fillStyle = "rgba(255,79,184,0.6)";
       ctx.fill();
       ctx.restore();
     } else {
@@ -2775,7 +3760,51 @@ function remainingEnemiesTotal() {
 }
 
 function maxLives() {
-  return 2 + game.level;
+  return baseLivesForLevel(game.level);
+}
+
+function setPlayerSkin(id) {
+  selectedPlayerSkinId = id;
+  updateStylePickerActive();
+  if (game.player) {
+    applyStyleToTank(game.player, currentPlayerStyle());
+  }
+}
+
+function renderPlayerStyleOptions() {
+  if (!playerStyleOptions) return;
+  playerStyleOptions.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (const skin of playerSkins) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "style-card";
+    btn.dataset.skinId = skin.id;
+    const accent = skin.accentColor ?? skin.turretColor ?? skin.color;
+    btn.innerHTML = `
+      <span class="style-swatch" style="background: linear-gradient(135deg, ${skin.color}, ${hexToRgba(
+      accent,
+      0.9
+    )});"></span>
+      <span class="style-card-text">
+        <span class="style-label">${skin.name}</span>
+        <span class="style-sub">${skin.desc}</span>
+      </span>
+    `;
+    btn.addEventListener("click", () => setPlayerSkin(skin.id));
+    frag.appendChild(btn);
+  }
+  playerStyleOptions.appendChild(frag);
+  updateStylePickerActive();
+}
+
+function updateStylePickerActive() {
+  if (!playerStyleOptions) return;
+  const cards = playerStyleOptions.querySelectorAll(".style-card");
+  cards.forEach((card) => {
+    const active = card.dataset.skinId === selectedPlayerSkinId;
+    card.classList.toggle("active", active);
+  });
 }
 
 function setupControls() {
@@ -2784,23 +3813,34 @@ function setupControls() {
     if (["w", "a", "s", "d", " ", "space", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
       e.preventDefault();
     }
-    if (game.modalAction) {
+    if (game.modalAction || game.modalSecondaryAction) {
       if (key === "enter" || key === " ") {
         e.preventDefault();
         confirmModal();
       } else if (key === "r" && game.modalAction === "retryLevel") {
         e.preventDefault();
         confirmModal();
+      } else if (key === "q") {
+        if (game.modalSecondaryAction === "backToModeSelect" || game.modalSecondaryAction === "backToSkinSelect") {
+          e.preventDefault();
+          confirmModal("secondary");
+        } else if (game.modalAction === "backToModeSelect" || game.modalAction === "backToSkinSelect") {
+          e.preventDefault();
+          confirmModal();
+        }
+      }
+      return;
+    }
+    if (key === "q") {
+      if (game.started && !game.gameOver) {
+        e.preventDefault();
+        promptReturnToSkinSelect();
       }
       return;
     }
     if (key === "r") {
       if (game.started) {
-        if (game.gameOver) {
-          retryCurrentLevel();
-        } else {
-          resetGame();
-        }
+        retryCurrentLevel();
       }
       return;
     }
@@ -2817,12 +3857,34 @@ function normalizeKey(e) {
   return e.key === " " ? " " : e.key.toLowerCase();
 }
 
+function promptReturnToSkinSelect() {
+  showModal({
+    title: "返回皮肤选择？",
+    desc: "当前战斗将结束，返回皮肤/模式选择界面后可重新装扮再出发。",
+    buttonText: "返回皮肤选择",
+    action: "backToModeSelect",
+    actionStatus: "已返回皮肤/模式选择，可重新装扮后再战",
+    secondaryText: "继续战斗",
+    secondaryAction: null,
+  });
+}
+
 setupControls();
-game.status = "阅读说明后点击“确认”开始";
+game.status = "阅读说明后点击“前往模式选择”";
 updateHud();
+renderPlayerStyleOptions();
 if (startButton) {
   startButton.addEventListener("click", beginGame);
 }
 if (modalButton) {
   modalButton.addEventListener("click", confirmModal);
+}
+if (modalSecondaryButton) {
+  modalSecondaryButton.addEventListener("click", () => confirmModal("secondary"));
+}
+if (modeNormalBtn) {
+  modeNormalBtn.addEventListener("click", () => startGameWithMode("normal"));
+}
+if (modeOneLifeBtn) {
+  modeOneLifeBtn.addEventListener("click", () => startGameWithMode("oneLife"));
 }

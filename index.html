@@ -10,15 +10,30 @@
   <div class="start-screen" id="start-screen">
     <div class="start-panel">
       <div class="start-title">战场说明</div>
-      <div class="start-desc">阅读后点击下方“确认”开始游戏。</div>
+      <div class="start-desc">阅读后点击下方按钮，进入模式选择界面再开始游戏。</div>
       <ul class="start-list">
         <li><strong>目标：</strong>存活下来并清掉所有敌方坦克，进入更高关卡。</li>
         <li><strong>移动：</strong>W 前进，S 后退；A/D 只用于左/右旋转方向。</li>
         <li><strong>攻击：</strong>空格射击，弹夹 5 发，装弹后继续开火。</li>
         <li><strong>小心：</strong>敌人会同时出现，子弹可多次反弹，护盾有限时间。</li>
+        <li><strong>返回：</strong>按 Q 呼出提示，可返回皮肤/模式选择界面。</li>
         <li><strong>重置：</strong>按 R 可重开，失败时弹窗/按 R 重试当前关。</li>
       </ul>
-      <button id="start-button" class="start-btn">确认，开始战斗</button>
+      <button id="start-button" class="start-btn">阅读完毕，前往模式选择</button>
+    </div>
+  </div>
+
+  <div class="start-screen hidden" id="mode-screen">
+    <div class="start-panel">
+      <div class="start-title">选择模式</div>
+      <div class="start-desc">普通闯关和一命过关两种节奏，任选其一开始战斗。</div>
+      <div class="style-picker">
+        <div class="style-title">我方坦克涂装</div>
+        <div class="start-desc" style="margin: 2px 0 10px">挑一款喜欢的外观，进入战斗前先装扮好坦克。</div>
+        <div class="style-options" id="player-style-options"></div>
+      </div>
+      <button id="mode-normal-btn" class="start-btn">普通闯关（每关回满生命）</button>
+      <button id="mode-one-life-btn" class="start-btn">一命过关（生命跨关延续，道具更多）</button>
     </div>
   </div>
 
@@ -30,7 +45,7 @@
       <span id="hud-enemies">敌人 0</span>
       <span id="hud-status"></span>
     </div>
-    <div class="controls">W/S 前进后退 · A/D 左右旋转 · 空格射击 · R 重开</div>
+    <div class="controls">W/S 前进后退 · A/D 左右旋转 · 空格射击 · Q 返回皮肤选择 · R 重开</div>
   </div>
 
   <div class="game-wrap">
@@ -41,7 +56,10 @@
     <div class="start-panel">
       <div class="start-title" id="modal-title">提示</div>
       <div class="start-desc" id="modal-desc">描述内容</div>
-      <button id="modal-button" class="start-btn">确认</button>
+      <div class="modal-actions">
+        <button id="modal-button" class="start-btn">确认</button>
+        <button id="modal-secondary-button" class="start-btn secondary" style="display: none">取消</button>
+      </div>
     </div>
   </div>
 
